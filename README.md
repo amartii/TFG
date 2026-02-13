@@ -96,4 +96,4 @@ Para activarlo:
 
 ## Autor
 
-Álvaro C. Martínez
+Álvaro Martínez Téllez
