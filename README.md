@@ -27,11 +27,6 @@ TFG/
 
 La configuración de Docker se encuentra dentro de la carpeta de la plantilla LaTeX, ya que solo se utiliza para compilar el documento.
 
-### Requisitos
-
-- Docker instalado en tu sistema
-- Sistema operativo: Linux, macOS o Windows con WSL2
-
 ### Construcción de la imagen
 
 Accede a la carpeta de la plantilla y construye la imagen Docker con TeX Live:
@@ -82,6 +77,7 @@ Si utilizas VS Code con la extensión Remote - Containers, el proyecto incluye u
 - Permite compilación directa desde el editor con compilación automática al guardar
 
 Para activarlo:
+
 1. Abre la carpeta `plantilla/plantilla-latex-tfg-tfm/` en VS Code
 2. VS Code detectará automáticamente la configuración del dev container
 3. Haz clic en "Reopen in Container" cuando se sugiera
@@ -93,7 +89,8 @@ Para activarlo:
 ## Estado del Proyecto
 
 - [X] Definición del tema
+- [X] Creación Plantilla en Latex
 
 ## Autor
 
-Álvaro C. Martínez
+Álvaro Martínez Téllez
