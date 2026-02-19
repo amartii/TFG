@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemelo Digital 5G - Planificación de Cobertura de Burbujas Tácticas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header__brand">
+        <div class="header__logo">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+            <circle cx="20" cy="20" r="12" stroke="currentColor" stroke-width="2" opacity="0.5"/>
+            <circle cx="20" cy="20" r="6" fill="currentColor"/>
+            <path d="M20 2 L20 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 32 L20 38" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M2 20 L8 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M32 20 L38 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="header__title-group">
+          <h1 class="header__title">Gemelo Digital 5G</h1>
+          <span class="header__subtitle">Planificación de Cobertura - Burbujas Tácticas</span>
+        </div>
+      </div>
+
+      <nav class="header__nav">
+        <div class="header__status">
+          <span class="status-indicator status-indicator--online"></span>
+          <span>Sistema Activo</span>
+        </div>
+        <div class="header__info">
+          <div class="header__info-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <circle cx="12" cy="20" r="1"/>
+            </svg>
+            <span>Banda FR1 - 3.5 GHz</span>
+          </div>
+          <div class="header__info-item">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <span>Modelo Longley-Rice</span>
+          </div>
+        </div>
+      </nav>
+
+      <div class="header__actions">
+        <button class="btn btn--icon" title="Documentación" onclick="showDocs()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+        </button>
+        <button class="btn btn--icon" title="Información del TFG" onclick="showAbout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <path d="M12 17h.01"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar__content">
+          <!-- Selector de Simulación -->
+          <section class="sidebar__section">
+            <div class="section-header">
+              <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+              <h3 class="section-title">Simulación Activa</h3>
+            </div>
+            <select class="form-control" id="simulationSelect" onchange="changeSimulation()">
+              <option value="campus-urjc">Campus URJC Fuenlabrada</option>
+              <option value="sierra-madrid">Sierra de Madrid - Zona Rural</option>
+              <option value="centro-madrid">Centro de Madrid - Urbano Denso</option>
+            </select>
+          </section>
+
+          <!-- Configuración de la Simulación -->
+          <section class="sidebar__section config">
+            <div class="section-header">
+              <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <h3 class="section-title">Parámetros TX</h3>
+            </div>
+            <div class="config__params" id="configParams">
+              <!-- Se llena dinámicamente -->
+            </div>
+          </section>
+
+          <!-- Filtro RSRP -->
+          <section class="sidebar__section">
+            <div class="section-header">
+              <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+              <h3 class="section-title">Filtro de Cobertura</h3>
+            </div>
+            <div class="filter-control">
+              <div class="filter-labels">
+                <span>Umbral RSRP mínimo</span>
+                <span class="filter-value font-mono" id="thresholdValue">-140 dBm</span>
+              </div>
+              <input type="range" class="range-slider" id="rsrpSlider" min="-140" max="-40" value="-140" step="5" oninput="updateThreshold(this.value)">
+              <div class="filter-range">
+                <span>-140 dBm</span>
+                <span>-40 dBm</span>
+              </div>
+            </div>
+            <div class="filter-info">
+              <span class="filter-info__label">Puntos visibles:</span>
+              <span class="filter-info__value font-mono" id="visiblePoints">3,600 / 3,600</span>
+            </div>
+          </section>
+
+          <!-- Leyenda de Cobertura -->
+          <section class="sidebar__section legend">
+            <div class="section-header">
+              <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              <h3 class="section-title">Leyenda RSRP</h3>
+            </div>
+            <div class="legend__items">
+              <div class="legend__item">
+                <div class="legend__color" style="background-color: #10b981;"></div>
+                <div class="legend__info">
+                  <span class="legend__label">Excelente</span>
+                  <span class="legend__range font-mono">-70 a -40 dBm</span>
+                </div>
+              </div>
+              <div class="legend__item">
+                <div class="legend__color" style="background-color: #fbbf24;"></div>
+                <div class="legend__info">
+                  <span class="legend__label">Buena</span>
+                  <span class="legend__range font-mono">-85 a -70 dBm</span>
+                </div>
+              </div>
+              <div class="legend__item">
+                <div class="legend__color" style="background-color: #f97316;"></div>
+                <div class="legend__info">
+                  <span class="legend__label">Aceptable</span>
+                  <span class="legend__range font-mono">-100 a -85 dBm</span>
+                </div>
+              </div>
+              <div class="legend__item">
+                <div class="legend__color" style="background-color: #ef4444;"></div>
+                <div class="legend__info">
+                  <span class="legend__label">Débil</span>
+                  <span class="legend__range font-mono">-140 a -100 dBm</span>
+                </div>
+              </div>
+            </div>
+            <div class="legend__note">
+              <svg class="legend__note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>RSRP: Reference Signal Received Power - Indicador principal de cobertura 5G NR</span>
+            </div>
+          </section>
+
+          <!-- Estadísticas -->
+          <section class="sidebar__section stats">
+            <div class="section-header">
+              <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <h3 class="section-title">Estadísticas</h3>
+            </div>
+            <div class="stats__grid" id="statsGrid">
+              <!-- Se llena dinámicamente -->
+            </div>
+            <div class="distribution">
+              <div class="distribution__header">Distribución de Cobertura</div>
+              <div class="distribution__bars" id="distributionBars">
+                <!-- Se llena dinámicamente -->
+              </div>
+              <div class="distribution__legend">
+                <span class="legend-item"><span class="dot dot--excellent"></span> Excelente</span>
+                <span class="legend-item"><span class="dot dot--good"></span> Buena</span>
+                <span class="legend-item"><span class="dot dot--acceptable"></span> Aceptable</span>
+                <span class="legend-item"><span class="dot dot--weak"></span> Débil</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="sidebar__footer">
+          <div class="footer-info">
+            <svg class="footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span id="lastUpdate">Última actualización: --:--:--</span>
+          </div>
+          <div class="footer-credits">
+            <span>TFG - Álvaro Martínez Téllez</span>
+            <span class="text-muted">URJC 2025/2026</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAP AREA -->
+      <div class="map-area">
+        <div id="map" class="map"></div>
+
+        <!-- Overlay información coordenadas -->
+        <div class="map-overlay map-overlay--top-right">
+          <div class="map-info">
+            <span class="map-info__label">Coordenadas TX</span>
+            <span class="map-info__value font-mono" id="txCoords">40.2897°N, 3.8244°W</span>
+          </div>
+        </div>
+
+        <!-- Controles del mapa -->
+        <div class="map-overlay map-overlay--bottom-left">
+          <div class="map-controls">
+            <button class="map-control-btn" onclick="centerOnTx()" title="Centrar en transmisor">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3"/>
+                <line x1="12" y1="2" x2="12" y2="6"/>
+                <line x1="12" y1="18" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="22" y2="12"/>
+              </svg>
+            </button>
+            <button class="map-control-btn" onclick="toggleHeatmap()" title="Toggle Heatmap" id="heatmapToggle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="6"/>
+                <circle cx="12" cy="12" r="2"/>
+              </svg>
+            </button>
+            <button class="map-control-btn" onclick="fitBounds()" title="Ajustar vista">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel de información del punto seleccionado -->
+        <div class="info-panel" id="infoPanel" style="display: none;">
+          <div class="info-panel__header">
+            <h4 class="info-panel__title">
+              <svg class="info-panel__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              Punto de Cobertura
+            </h4>
+            <button class="info-panel__close" onclick="closeInfoPanel()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="info-panel__content" id="infoPanelContent">
+            <!-- Se llena dinámicamente -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal de Documentación -->
+  <div class="modal" id="docsModal" style="display: none;">
+    <div class="modal__backdrop" onclick="closeModal('docsModal')"></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2>Documentación del Sistema</h2>
+        <button class="modal__close" onclick="closeModal('docsModal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <h3>Arquitectura del Sistema</h3>
+        <p>El Gemelo Digital 5G se compone de tres capas principales:</p>
+        <ul>
+          <li><strong>Capa de Ingeniería (MATLAB):</strong> Simulación de propagación con modelo Longley-Rice</li>
+          <li><strong>Capa de Servidor (Spring Boot):</strong> API REST para gestión de datos</li>
+          <li><strong>Capa de Usuario (Angular):</strong> Interfaz web con visualización Leaflet</li>
+        </ul>
+
+        <h3>Modelo de Propagación</h3>
+        <p>Se utiliza el modelo <strong>Longley-Rice (ITM)</strong> para calcular las pérdidas de propagación, considerando:</p>
+        <ul>
+          <li>Frecuencia de operación: 3.5 GHz (banda n78 5G FR1)</li>
+          <li>Datos de elevación SRTM con resolución 30m</li>
+          <li>Parámetros atmosféricos estándar</li>
+        </ul>
+
+        <h3>Parámetros RSRP</h3>
+        <table class="doc-table">
+          <tr><th>Nivel</th><th>Rango (dBm)</th><th>Descripción</th></tr>
+          <tr><td class="rsrp-excellent">Excelente</td><td>-70 a -40</td><td>Cobertura óptima para todos los servicios</td></tr>
+          <tr><td class="rsrp-good">Buena</td><td>-85 a -70</td><td>Calidad de servicio estable</td></tr>
+          <tr><td class="rsrp-acceptable">Aceptable</td><td>-100 a -85</td><td>Servicio básico disponible</td></tr>
+          <tr><td class="rsrp-weak">Débil</td><td>-140 a -100</td><td>Sin servicio o muy limitado</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal About -->
+  <div class="modal" id="aboutModal" style="display: none;">
+    <div class="modal__backdrop" onclick="closeModal('aboutModal')"></div>
+    <div class="modal__content">
+      <div class="modal__header">
+        <h2>Sobre el Proyecto</h2>
+        <button class="modal__close" onclick="closeModal('aboutModal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="about-header">
+          <h3>Trabajo Fin de Grado</h3>
+          <p class="about-title">"Diseño e Implementación de una Herramienta de Gemelo Digital para la Planificación y Visualización de Cobertura en Redes 5G Tácticas Desplegables"</p>
+        </div>
+
+        <div class="about-info">
+          <div class="about-item">
+            <span class="about-label">Autor:</span>
+            <span class="about-value">Álvaro Martínez Téllez</span>
+          </div>
+          <div class="about-item">
+            <span class="about-label">Grado:</span>
+            <span class="about-value">Ingeniería de Sistemas de Telecomunicación</span>
+          </div>
+          <div class="about-item">
+            <span class="about-label">Universidad:</span>
+            <span class="about-value">Universidad Rey Juan Carlos</span>
+          </div>
+          <div class="about-item">
+            <span class="about-label">Curso:</span>
+            <span class="about-value">2025/2026</span>
+          </div>
+        </div>
+
+        <h4>Objetivos del Proyecto</h4>
+        <ul>
+          <li>Desarrollar herramienta de planificación de cobertura 5G para burbujas tácticas</li>
+          <li>Implementar modelo de propagación Longley-Rice en MATLAB</li>
+          <li>Crear interfaz web interactiva con visualización de mapas de calor</li>
+          <li>Validar resultados en escenarios reales (Campus URJC)</li>
+        </ul>
+
+        <h4>Tecnologías</h4>
+        <div class="tech-stack">
+          <span class="tech-badge">Angular 17</span>
+          <span class="tech-badge">Spring Boot 3</span>
+          <span class="tech-badge">MATLAB</span>
+          <span class="tech-badge">Leaflet.js</span>
+          <span class="tech-badge">TypeScript</span>
+          <span class="tech-badge">OpenStreetMap</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

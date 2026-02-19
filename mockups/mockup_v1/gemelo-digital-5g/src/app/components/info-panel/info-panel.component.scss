@@ -1,0 +1,202 @@
+@use '../../../styles/variables' as *;
+
+.info-panel {
+  position: absolute;
+  bottom: $spacing-lg;
+  right: $spacing-lg;
+  width: $info-panel-width;
+  background: $color-bg-card;
+  border: 1px solid $color-border;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-lg;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-md $spacing-lg;
+    background: $color-bg-tertiary;
+    border-bottom: 1px solid $color-border;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text-primary;
+  }
+
+  &__icon {
+    width: 18px;
+    height: 18px;
+    color: $color-accent-primary;
+  }
+
+  &__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: $border-radius-sm;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      color: $color-text-muted;
+    }
+
+    &:hover {
+      background: rgba($color-accent-danger, 0.1);
+
+      svg {
+        color: $color-accent-danger;
+      }
+    }
+  }
+
+  &__content {
+    padding: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+  }
+}
+
+.signal-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: $spacing-lg;
+  border-radius: $border-radius-md;
+  text-align: center;
+
+  &--excelente {
+    background: rgba($color-rsrp-excellent, 0.1);
+    border: 1px solid rgba($color-rsrp-excellent, 0.3);
+
+    .signal-indicator__value { color: $color-rsrp-excellent; }
+    .bar.active { background: $color-rsrp-excellent; }
+  }
+
+  &--buena {
+    background: rgba($color-rsrp-good, 0.1);
+    border: 1px solid rgba($color-rsrp-good, 0.3);
+
+    .signal-indicator__value { color: $color-rsrp-good; }
+    .bar.active { background: $color-rsrp-good; }
+  }
+
+  &--aceptable {
+    background: rgba($color-rsrp-acceptable, 0.1);
+    border: 1px solid rgba($color-rsrp-acceptable, 0.3);
+
+    .signal-indicator__value { color: $color-rsrp-acceptable; }
+    .bar.active { background: $color-rsrp-acceptable; }
+  }
+
+  &--débil {
+    background: rgba($color-rsrp-weak, 0.1);
+    border: 1px solid rgba($color-rsrp-weak, 0.3);
+
+    .signal-indicator__value { color: $color-rsrp-weak; }
+    .bar.active { background: $color-rsrp-weak; }
+  }
+
+  &__value {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    line-height: 1;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    color: $color-text-secondary;
+    margin-top: $spacing-xs;
+  }
+
+  &__bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    margin-top: $spacing-md;
+    height: 24px;
+
+    .bar {
+      width: 8px;
+      background: $color-border;
+      border-radius: 2px;
+      transition: all $transition-fast;
+
+      &:nth-child(1) { height: 6px; }
+      &:nth-child(2) { height: 12px; }
+      &:nth-child(3) { height: 18px; }
+      &:nth-child(4) { height: 24px; }
+
+      &.active {
+        box-shadow: 0 0 6px currentColor;
+      }
+    }
+  }
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-sm 0;
+  border-bottom: 1px solid rgba($color-border, 0.5);
+
+  &__label {
+    font-size: $font-size-sm;
+    color: $color-text-secondary;
+  }
+
+  &__value {
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.info-description {
+  display: flex;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background: $color-bg-tertiary;
+  border-radius: $border-radius-md;
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  line-height: 1.5;
+
+  &__icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    color: $color-accent-secondary;
+    margin-top: 2px;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
