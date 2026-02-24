@@ -1,197 +1,132 @@
-# TFG - Trabajo de Fin de Grado
+# TFG — Diseño e Implementación de una Herramienta de Gemelo Digital (Digital Twin) para la Planificación y Visualización de Cobertura en Redes 5G Tácticas Desplegables
+
+**Autor:** Álvaro Martínez Téllez  
+**Tutor:** Miguel Ángel Ortuño Pérez  
+**Grado:** Ingeniería en Sistemas de Telecomunicaciones — URJC, Escuela de Ingeniería de Fuenlabrada  
+**Curso académico:** 2025-2026
+
+---
 
 ## Descripción
 
-Proyecto de Trabajo de Fin de Grado sobre la implementación de un gemelo digital 5G.
+Prueba de concepto (PoC) de una herramienta de Gemelo Digital web para la planificación y visualización de cobertura en redes 5G FR1 (sub-6 GHz) tácticas desplegables. La solución integra tres capas tecnológicas: simulación radioeléctrica en MATLAB (modelo Longley-Rice), backend REST con Spring Boot y frontend Angular con mapas Leaflet.
 
 ## Estructura del Proyecto
 
 ```
 TFG/
 ├── docs/                                    # Documentación del proyecto
-│   ├── Anteproyecto/                        # Anteproyecto de inicio
-│   └── Indice/                              # Índices y propuestas
+│   ├── Anteproyecto/                        # Anteproyecto del TFG (PDF + DOCX)
+│   └── Indice/                              # Propuesta de índice de la memoria
 ├── mockups/
-│   ├── readme.md                            # Documentación de mockups
-│   └── mockup_v1/                           # Primera versión de mockups
-│       ├── gemelo-digital-5g/               # Proyecto Angular completo
-│       │   ├── src/                         # Código fuente
-│       │   │   ├── app/
-│       │   │   │   ├── components/          # Componentes Angular
-│       │   │   │   ├── services/            # Servicios (simulación)
-│       │   │   │   └── models/              # Modelos de datos
-│       │   │   ├── assets/                  # Datos y recursos
-│       │   │   └── styles/                  # Estilos SCSS
-│       │   ├── angular.json                 # Configuración Angular
-│       │   ├── package.json                 # Dependencias npm
-│       │   └── tsconfig.json                # Configuración TypeScript
-│       └── gemelo-digital-5g-demo/          # Demo estática (HTML/CSS/JS)
-│           ├── index.html
-│           ├── app.js
-│           └── styles.css
-├── plantilla/
-│   └── plantilla-latex-tfg-tfm/             # Plantilla LaTeX para memoria
-│       ├── Dockerfile                       # Imagen Docker con TeX Live
-│       ├── Makefile                         # Comandos para compilación
-│       ├── memoria.tex                      # Documento principal
-│       ├── bibliografia.bib                 # Referencias bibliográficas
-│       ├── capitulos/                       # Capítulos del TFG
-│       ├── portada/                         # Portada y preliminares
-│       └── figs/                            # Figuras y gráficos
+│   └── mockup_v1/                           # Primera iteración del prototipo visual
+│       ├── gemelo-digital-5g/               # Mockup Angular (interfaz interactiva)
+│       │   ├── src/app/
+│       │   │   ├── components/              # MapComponent, SidebarComponent, etc.
+│       │   │   ├── services/                # SimulationService
+│       │   │   └── models/                  # Modelos de datos
+│       │   ├── angular.json
+│       │   └── package.json
+│       └── gemelo-digital-5g-demo/          # Demo estática HTML/CSS/JS
+├── TFG GD5G/                                # Memoria del TFG en LaTeX
+│   ├── memoria.tex                          # Documento principal
+│   ├── estilo.tex                           # Estilos (soporte MATLAB, Java, TypeScript)
+│   ├── bibliografia.bib                     # Referencias bibliográficas
+│   ├── Makefile                             # Compilación local (pdflatex + bibtex)
+│   ├── Dockerfile                           # Compilación con Docker (TeX Live)
+│   ├── .gitignore                           # Ignora artefactos LaTeX
+│   ├── portada/
+│   │   ├── portada.tex                      # Portada oficial URJC
+│   │   ├── resumen.tex                      # Resumen en español
+│   │   ├── abstract.tex                     # Abstract en inglés
+│   │   ├── agradecimientos.tex
+│   │   ├── dedicatoria.tex
+│   │   ├── acronimos.tex                    # Lista de acrónimos (5G, RSRP, API…)
+│   │   ├── licencia.tex                     # Licencia CC BY-SA
+│   │   └── indice.tex                       # Carga todas las páginas preliminares
+│   ├── capitulos/
+│   │   ├── capitulo1.tex                    # Introducción
+│   │   ├── capitulo2.tex                    # Estado del Arte
+│   │   ├── capitulo3.tex                    # Análisis y Diseño
+│   │   ├── capitulo4.tex                    # Implementación
+│   │   ├── capitulo5.tex                    # Validación y Resultados
+│   │   ├── capitulo6.tex                    # Conclusiones y Trabajo Futuro
+│   │   └── anexos.tex                       # Anexos A-F
+│   └── figs/
+│       ├── logo_urjc.jpg                    # Logo URJC (portada)
+│       └── by-sa.png                        # Imagen licencia CC BY-SA
+├── versiones memoria/                       # PDFs compilados de la memoria
+│   ├── memoria_v1_indice_limpio.pdf         # v1: solo títulos de sección
+│   └── memoria_v2_plantilla_comentarios.pdf # v2: guías de contenido en cursiva
 ├── Dockerfile                               # Contenedor del proyecto
 ├── README.md                                # Este archivo
-└── .gitignore                               # Archivos ignorados
+└── .gitignore
 ```
 
 ## Componentes del Proyecto
 
-### 1. Mockup - Gemelo Digital 5G (Angular)
+### 1. Memoria LaTeX (`TFG GD5G/`)
 
-Interfaz interactiva implementada en **Angular** que simula un gemelo digital 5G.
+Memoria del TFG estructurada en 6 capítulos + 6 anexos, lista para ir rellenando progresivamente.
 
-**Ubicación**: `mockups/mockup_v1/gemelo-digital-5g/`
+**Compilación local** (requiere MiKTeX o TeX Live):
 
-**Características**:
-- Mapa interactivo de cobertura
-- Panel de información
-- Panel de estadísticas
-- Barra lateral de navegación
-- Configuración de simulaciones
-- Leyenda de cobertura
+```bash
+cd "TFG GD5G"
+make          # ejecuta pdflatex + bibtex + pdflatex x2
+make clean    # elimina artefactos de compilación
+```
 
-**Requisitos**:
-- Node.js (v16 o superior)
-- npm
+**Compilación con Docker**:
 
-**Instalación y ejecución**:
+```bash
+cd "TFG GD5G"
+docker build -t tfg-latex .
+docker run --rm -v "$(pwd):/workspace" tfg-latex make
+```
+
+### 2. Mockup Angular (`mockups/mockup_v1/gemelo-digital-5g/`)
+
+Prototipo visual de la interfaz web del gemelo digital con mapa de cobertura interactivo.
+
+**Requisitos:** Node.js ≥ 16, Angular CLI 17
 
 ```bash
 cd mockups/mockup_v1/gemelo-digital-5g
 npm install
-ng serve
-# O si no tienes Angular CLI global:
-npm start
+ng serve        # disponible en http://localhost:4200
 ```
 
-La aplicación estará disponible en `http://localhost:4200`
+### 3. Demo estática (`mockups/mockup_v1/gemelo-digital-5g-demo/`)
 
-**Compilación para producción**:
-
-```bash
-ng build --configuration production
-```
-
-### 2. Demo - Gemelo Digital 5G (HTML/CSS/JS)
-
-Versión estática de demostración sin dependencias externas.
-
-**Ubicación**: `mockups/mockup_v1/gemelo-digital-5g-demo/`
-
-**Características**:
-- Interfaz estática simplificada
-- Acceso directo sin instalación de dependencias
-- Ideal para presentaciones rápidas
-
-**Ejecución**:
-
-Abre directamente `index.html` en un navegador web.
-
-### 3. Plantilla LaTeX - Memoria del TFG
-
-
-Plantilla profesional para la redacción de la memoria del Trabajo de Fin de Grado.
-
-**Ubicación**: `plantilla/plantilla-latex-tfg-tfm/`
-
-**Estructura**:
-- Portada automática
-- Capítulos organizados
-- Bibliografía integrada
-- Índice automático
-
-## Compilación de la Memoria LaTeX
-
-### Compilación con Docker
-
-```bash
-cd plantilla/plantilla-latex-tfg-tfm
-
-# Construcción de la imagen
-docker build -t tfg-latex .
-
-# Compilación de la memoria
-docker run --rm -v "$(pwd):/workspace" tfg-latex make
-
-# Limpia archivos temporales
-docker run --rm -v "$(pwd):/workspace" tfg-latex make clean
-```
-
-El PDF se generará en `memoria.pdf`.
-
-### Compilación Local
-
-Si tienes TeX Live instalado:
-
-```bash
-cd plantilla/plantilla-latex-tfg-tfm
-make
-```
-
-## Instalación y Configuración
-
-### Requisitos Globales
-
-- Git
-- Node.js y npm (para el proyecto Angular)
-- Docker (opcional, para compilación de LaTeX)
-- TeX Live (opcional, para compilación local de LaTeX)
-
-### Clonar el Repositorio
-
-```bash
-git clone https://github.com/amartii/TFG.git
-cd TFG
-```
-
-### Estructura de Desarrollo
-
-```
-# Para trabajar en el mockup Angular
-cd mockups/mockup_v1/gemelo-digital-5g/
-
-# Para editar la memoria LaTeX
-cd plantilla/plantilla-latex-tfg-tfm/
-
-# Para visualizar documentación
-cd docs/
-```
-
-## Referencias
-
-- **Plantilla LaTeX TFG**: https://gitlab.eif.urjc.es/jmvega/plantilla-latex-tfg-tfm/-/tree/master
-- **Angular Documentation**: https://angular.io/docs
-- **TeX Live**: https://www.tug.org/texlive/
+Versión HTML/CSS/JS sin dependencias. Abrir `index.html` directamente en el navegador.
 
 ## Estado del Proyecto
 
-- [X] Definición del tema
-- [X] Creación Plantilla en LaTeX
-- [X] Primer mockup en Angular
-- [X] Demo estática HTML/CSS/JS
-- [ ] Implementación de simulaciones
-- [ ] Integración con datos reales 5G
-- [ ] Finalización de memoria
+- [x] Anteproyecto aprobado
+- [x] Propuesta de índice definida
+- [x] Estructura de memoria LaTeX creada
+- [x] Mockup Angular v1
+- [x] Demo estática HTML/CSS/JS
+- [ ] Simulación MATLAB (motor Longley-Rice)
+- [ ] Backend Spring Boot (API REST)
+- [ ] Frontend Angular definitivo
+- [ ] Validación con escenario real (URJC Fuenlabrada)
+- [ ] Memoria finalizada
 
-## Teknologías Utilizadas
+## Tecnologías
 
-- **Frontend**: Angular 15+, TypeScript, SCSS
-- **Documentación**: LaTeX (TeX Live)
-- **Control de versiones**: Git / GitHub
-- **Contenedorización**: Docker
-- **Build Tools**: Angular CLI, Make
+| Capa | Tecnología |
+|---|---|
+| Simulación | MATLAB R2024a, Antenna Toolbox, Longley-Rice |
+| Backend | Java 17, Spring Boot 3, Maven, OpenAPI/Swagger |
+| Frontend | Angular 17, TypeScript, Leaflet, leaflet.heat |
+| Memoria | LaTeX (MiKTeX / TeX Live), pdflatex + bibtex |
+| Control de versiones | Git / GitHub |
 
-## Autor
+## Referencias
 
-**Álvaro Martínez Téllez**
-
-Trabajo de Fin de Grado - Curso 2025/2026
+- Plantilla LaTeX URJC: https://gitlab.eif.urjc.es/jmvega/plantilla-latex-tfg-tfm
+- Angular: https://angular.dev
+- Spring Boot: https://spring.io/projects/spring-boot
+- Leaflet: https://leafletjs.com
