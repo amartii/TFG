@@ -1,0 +1,110 @@
+% Retoca las líneas marcadas con TODO según las necesidades
+
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{makeidx}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{caption}
+\usepackage{acronym}
+\usepackage{hyphenat}
+\usepackage{a4wide}
+\usepackage[normalsize]{subfigure}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage[export]{adjustbox}
+\usepackage[Lenny]{fncychap}
+\usepackage{listings}
+\usepackage{eurosym}
+\usepackage{hyperref} % TODO: añade la opción hidelinks para imprimirlo
+
+% Para que no parta las palabras
+\pretolerance=10000
+
+\newcommand{\bigrule}{\titlerule[0.5mm]} \titleformat{\chapter}[display]
+{\bfseries\Huge}
+{%
+\titlerule
+\filright
+\Large\chaptertitlename\
+\Large
+\Huge \Large\thechapter}
+{0mm}
+{\filright}
+[\vspace{0.5mm} \bigrule]
+\geometry{a4paper, left=3.5cm, right=2cm, top=3cm, bottom=2cm, headsep=1.5cm}
+
+% Colores para listados de código
+\definecolor{code_green}{rgb}{0,0.6,0}
+\definecolor{code_gray}{rgb}{0.5,0.5,0.5}
+\definecolor{code_mauve}{rgb}{0.58,0,0.82}
+\definecolor{code_blue}{rgb}{0.13,0.29,0.53}
+\definecolor{code_lightgray}{rgb}{0.95,0.95,0.95}
+
+% Estilo base para todos los listados de código
+\lstset{
+  frame=tb,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=left,
+  numberstyle=\tiny\color{code_gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{code_green},
+  stringstyle=\color{code_mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
+  backgroundcolor=\color{code_lightgray}
+}
+
+% Definición de lenguaje MATLAB
+\lstdefinelanguage{MATLAB}{
+  keywords={break, case, catch, continue, else, elseif, end, for, function,
+    global, if, otherwise, persistent, return, switch, try, while, classdef,
+    properties, methods, events, parfor, spmd},
+  morekeywords=[2]{true, false, NaN, Inf, pi, eps},
+  sensitive=true,
+  morecomment=[l]{\%},
+  morecomment=[s]{\%\{}{\%\}},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+% Definición de lenguaje TypeScript (superset de JavaScript)
+\lstdefinelanguage{TypeScript}{
+  keywords={break, case, catch, continue, debugger, default, delete, do,
+    else, finally, for, function, if, in, instanceof, new, return, switch,
+    this, throw, try, typeof, var, void, while, with, let, const, class,
+    enum, export, extends, import, super, implements, interface, package,
+    private, protected, public, static, abstract, async, await, from, of,
+    type, namespace, module, declare, readonly, as, is},
+  morekeywords=[2]{string, number, boolean, any, void, never, object, symbol,
+    undefined, null, unknown, bigint, Array, Promise, Observable},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]`
+}
+
+% Definición de mis propios tipos: Códigos, Ecuaciones
+\DeclareCaptionType{code}[Código][Listado de códigos]
+\DeclareCaptionType{myequation}[Ecuación][Listado de ecuaciones]
+
+% Reglas de separación silábica
+\hyphenation{fuer-tes}
+\hyphenation{mul-ti-ca-pa}
+\hyphenation{res-pues-ta}
+\hyphenation{di-fe-ren-tes}
+\hyphenation{de-sa-rro-lla-dos}
+\hyphenation{re-pre-sen-tan-do}
+\hyphenation{co-be-rtu-ra}
+\hyphenation{pla-ni-fi-ca-cion}
+\hyphenation{vi-sua-li-za-cion}
+\hyphenation{des-pleg-a-bles}

@@ -1,0 +1,31 @@
+\chapter{Análisis y Diseño}
+\label{cap:capitulo3}
+
+\section{Requisitos del Sistema}
+\label{sec:requisitos}
+\textit{Funcionales (RF1-RF5): simulación 5G FR1, exportación JSON, API REST, visualización heatmap, filtrado interactivo RSRP.\\
+No funcionales (RNF1-RNF5): interfaz responsiva, rendimiento (<3s carga), escalabilidad (5-10 simulaciones), compatibilidad navegadores, mantenibilidad (cobertura tests >60\%).}
+
+\section{Arquitectura del Sistema}
+\label{sec:arquitectura}
+\textit{Capa 1 - Ingeniería (MATLAB offline): modelado Longley-Rice, datos SRTM, cálculo RSRP, exportación JSON.\\
+Capa 2 - Servidor (Spring Boot): API REST, gestión archivos JSON, documentación Swagger, manejo errores.\\
+Capa 3 - Usuario (Angular + Leaflet): visualización mapas, heatmap interactivo, selectores, consumo API.\\
+Flujo de datos: MATLAB → JSON → backend → API → frontend → heatmap.}
+
+\section{Diseño del Modelo de Datos}
+\label{sec:datos}
+\textit{Estructura JSON.\\
+Validación de rangos (RSRP -140 a -40 dBm, frecuencia 3.4-3.8 GHz).}
+
+\section{Diseño de la API REST (Backend)}
+\label{sec:api}
+\textit{Endpoints: GET /api/simulations, GET /simulations/\{id\}\ldots\\
+Arquitectura RESTful: stateless, HATEOAS parcial, idempotencia.\\
+Documentación Swagger/OpenAPI automática.}
+
+\section{Diseño de la Interfaz de Usuario (Frontend)}
+\label{sec:ui}
+\textit{Componentes Angular: MapComponent, HeatmapLayerComponent, ControlPanelComponent, InfoPanelComponent.\\
+Paleta colores heatmap: verde (excelente) → amarillo → naranja → rojo (débil).\\
+Layout: header + sidebar (selectores) + mapa principal + panel info flotante.}

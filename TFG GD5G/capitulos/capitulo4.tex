@@ -1,0 +1,28 @@
+\chapter{Implementación}
+\label{cap:capitulo4}
+
+\section{Implementación de la Simulación en MATLAB}
+\label{sec:impl_matlab}
+\textit{Entorno: MATLAB R2024a, Antenna Toolbox, Windows/Ubuntu.\\
+Modelo Longley-Rice implementado: parámetros configurables (fc=3.5 GHz, P\_tx=40 dBm, área 3×3 km).\\
+Integración datos elevación SRTM 30m.\\
+Algoritmo cálculo: grid 50m spacing, 3600 puntos, \textasciitilde5-8 min ejecución.\\
+Script exportación JSON con UUID único.}
+
+\section{Implementación del Backend (Spring Boot)}
+\label{sec:impl_backend}
+\textit{Configuración proyecto: Spring Initializr, Java 17, Maven.\\
+Estructura paquetes: controller, service, model, exception, config.\\
+SimulationController: endpoints REST con @RestController, manejo excepciones, CORS.\\
+SimulationService: lógica negocio, lectura archivos, parsing JSON con Jackson.}
+
+\section{Implementación del Frontend (Angular)}
+\label{sec:impl_frontend}
+\textit{SimulationService: comunicación con API vía HttpClient, manejo errores RxJS.\\
+MapComponent: inicialización Leaflet, tiles OSM, carga heatmap con leaflet.heat.\\
+Normalización RSRP [-140, -40] → para gradiente colores.\\
+Actualización heatmap en tiempo real según filtro slider.}
+
+\section{Integración del Sistema}
+\label{sec:integracion}
+\textit{Flujo completo: MATLAB → copia manual JSON → backend arranca → frontend consume API → renderizado heatmap.}

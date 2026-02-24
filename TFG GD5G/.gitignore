@@ -1,0 +1,22 @@
+# Artefactos de compilación LaTeX
+*.aux
+*.bbl
+*.blg
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.locode
+*.lomyequation
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.dvi
+*.ps
+
+# PDF compilado (las versiones se guardan en "versiones memoria")
+memoria.pdf
