@@ -1,1 +1,22 @@
+# Node
 node_modules/
+package-lock.json
+
+# Maven build output
+backend/target/
+
+# SRTM elevation data (binary, >25 MB)
+matlab/data/*.tif
+matlab/data/*.hgt
+matlab/data/*.zip
+
+# IDE & tooling
+.vscode/
+.idea/
+*.iml
+
+# Claude Code internals
+.claude/
+
+# Sprint notes & personal planning
+ToGetDone/
