@@ -116,79 +116,98 @@ else
     warning('Fichero SRTM no encontrado. Usando terreno plano (elev=0).');
     elev_grid = zeros(nPuntos^2, 1);
 
-    % TODO: Sustituir por datos SRTM reales cuando estén disponibles
-    % Para terreno sintético de prueba (colina gaussiana):
-    % dist_m = sqrt(((lons_flat - lon0) * 111000 * cosd(lat0)).^2 + ...
-    %               ((lats_flat - lat0) * 111000).^2);
-    % elev_grid = 50 * exp(-dist_m.^2 / (500^2));  % Colina de 50m, sigma=500m
+    % Para pruebas sin SRTM se puede activar un terreno sintético (colina gaussiana):
+    % dist_sint = sqrt(((lons_flat-lon0)*111000*cosd(lat0)).^2 + ...
+    %                  ((lats_flat-lat0)*111000).^2);
+    % elev_grid = 50 * exp(-dist_sint.^2 / (500^2));  % colina 50 m, sigma=500 m
 end
 
+% Flag para que el resto del script sepa qué fuente de elevación se usó
+tiene_srtm = isfile(srtm_file);
+
 %% =========================================================================
-%  BLOQUE 4: MODELO DE PROPAGACIÓN — LONGLEY-RICE (ITM)
+%  BLOQUE 4: MODELO DE PROPAGACIÓN — LONGLEY-RICE (ITM) / FALLBACK
 %  =========================================================================
-% MATLAB Communications Toolbox implementa Longley-Rice a través de
-% propagationModel('longley-rice') + txsite/rxsite desde R2019b.
+% Selección automática del modelo según toolboxes disponibles:
+%   1) Longley-Rice ITM  — si Communications Toolbox está instalado (R2019b+)
+%   2) COST-231 Hata     — fallback empírico si no hay Communications Toolbox
 %
-% ALTERNATIVAS si no está disponible el toolbox:
-%   A) Usar esta función con el modelo ITM portado a MATLAB (ver refs.)
-%   B) Usar COST-231 Hata como aproximación (ver BLOQUE 4B más abajo)
-%   C) Llamar a ejecutable C del NTIA vía system()
+% FSPL se calcula siempre como cota superior teórica para validación.
+%
+% REFERENCIAS:
+%   Longley-Rice: Longley & Rice (1968), ESSA Tech Report ERL 79-ITS 67.
+%   COST-231 Hata: COST Action 231, Final Report, European Commission, 1999.
 
-% --- Definición del sitio transmisor ---
-tx = txsite('cartesian', ...  % usar 'geographic' si Communications Toolbox disponible
-    'Latitude',  lat0, ...
-    'Longitude', lon0, ...
-    'AntennaHeight', hTx_m, ...
-    'TransmitterFrequency', fc_Hz, ...
-    'TransmitterPower', Ptx_W);
+% --- Auto-detección de Communications Toolbox ---
+% ver('comm') es el método fiable; license('test',...) no funciona porque
+% el identificador de licencia no coincide con el nombre del toolbox.
+v_comm = ver('comm');
+tiene_comm_toolbox = ~isempty(v_comm);
 
-% --- OPCIÓN A: propagationModel de MATLAB (requiere Communications Toolbox) ---
-% Descomentar si tienes Communications Toolbox con Site Designer:
-%{
-pm = propagationModel('longley-rice', ...
-    'TimeVariabilityTolerance', 0.5, ...   % Fiabilidad del 50% (mediana)
-    'LocationVariabilityTolerance', 0.5);
+if tiene_comm_toolbox
+    % -----------------------------------------------------------------------
+    % OPCIÓN A: Longley-Rice ITM via Communications Toolbox (preferido)
+    % propagationModel('longley-rice') disponible desde R2019b.
+    % Usa terreno de la base de datos interna de MATLAB (SRTM 90m global).
+    % Si se carga un siteviewer con el .tif local se obtiene mejor resolución.
+    % -----------------------------------------------------------------------
+    fprintf('Communications Toolbox detectado → Longley-Rice ITM\n');
 
-rx_sites = rxsite('Latitude', lats_flat, 'Longitude', lons_flat, ...
-    'AntennaHeight', hRx_m);
+    tx = txsite('Name', 'gNodeB_URJC', ...
+        'Latitude',             lat0, ...
+        'Longitude',            lon0, ...
+        'AntennaHeight',        hTx_m, ...
+        'TransmitterFrequency', fc_Hz, ...
+        'TransmitterPower',     Ptx_W);
 
-% sigstrength devuelve la potencia recibida en dBm
-Prx_dBm = sigstrength(rx_sites, tx, pm);
-%}
+    % Usar defaults del modelo (fiabilidad temporal y de emplazamiento = 50 %).
+    % Los parámetros TimeVariabilityTolerance / LocationVariabilityTolerance
+    % fueron eliminados en R2023b+; los defaults son equivalentes a 0.5.
+    pm = propagationModel('longley-rice');
 
-% --- OPCIÓN B: Modelo COST-231 Hata (urbano/suburbano, 1500 MHz–2000 MHz) ---
-% Nota: estrictamente válido hasta 2 GHz; usar como aproximación para 3.5 GHz
-% con corrección de frecuencia adicional.
-% Se usa aquí como implementación de prueba hasta tener Longley-Rice.
-%{
-% Distancia 3D a cada punto del grid [km]
-dist_km = sqrt( ((lons_flat - lon0) .* 111 .* cosd(lat0)).^2 + ...
-                ((lats_flat - lat0) .* 111).^2 );
-dist_km = max(dist_km, 0.01);  % Evitar log(0), mínimo 10 m
+    rx_sites = rxsite('Latitude',      lats_flat, ...
+                      'Longitude',     lons_flat, ...
+                      'AntennaHeight', hRx_m);
 
-fc_MHz = fc_Hz / 1e6;
-a_hRx = (1.1 * log10(fc_MHz) - 0.7) * hRx_m - (1.56 * log10(fc_MHz) - 0.8);
-PL_dB = 46.3 + 33.9*log10(fc_MHz) - 13.82*log10(hTx_m) - a_hRx ...
-      + (44.9 - 6.55*log10(hTx_m)) .* log10(dist_km) + 3;  % C_m=3 dB (ciudad media)
-%}
+    fprintf('Calculando Longley-Rice para %d puntos (puede tardar ~60 s)...\n', ...
+        length(lats_flat));
+    Prx_dBm    = sigstrength(rx_sites, tx, pm);
+    Prx_dBm    = Prx_dBm(:);   % garantizar vector columna
+    modelo_usado = 'Longley-Rice';
 
-% --- OPCIÓN C: Free Space Path Loss (FSPL) — baseline teórico ---
-% Útil para validar que los resultados son coherentes con el límite superior
-dist_m = sqrt( ((lons_flat - lon0) .* 111000 .* cosd(lat0)).^2 + ...
-               ((lats_flat - lat0) .* 111000).^2 );
-dist_m = max(dist_m, 1);  % mínimo 1 m
+else
+    % -----------------------------------------------------------------------
+    % OPCIÓN B: COST-231 Hata extendido (fallback sin Communications Toolbox)
+    % Válido: 1500–2000 MHz (estrictamente); a 3.5 GHz introduce ~2-4 dB extra.
+    % Escenario: urbano-suburbano macro-célula (C_m = 3 dB).
+    % -----------------------------------------------------------------------
+    fprintf('Communications Toolbox NO disponible → COST-231 Hata (fallback)\n');
 
-% FSPL(d,f) = 20*log10(d) + 20*log10(f) + 20*log10(4*pi/c)
-c = 3e8;
-FSPL_dB = 20*log10(dist_m) + 20*log10(fc_Hz) + 20*log10(4*pi/c);
+    dist_km = sqrt( ((lons_flat - lon0) .* 111 .* cosd(lat0)).^2 + ...
+                    ((lats_flat - lat0) .* 111).^2 );
+    dist_km  = max(dist_km, 0.01);   % mínimo 10 m para evitar log(0)
 
-% Potencia recibida con FSPL [dBm]
-Prx_dBm_FSPL = EIRP_dBm + Grx_dBi - FSPL_dB;
+    fc_MHz  = fc_Hz / 1e6;
+    a_hRx   = (1.1*log10(fc_MHz) - 0.7)*hRx_m - (1.56*log10(fc_MHz) - 0.8);
+    PL_dB   = 46.3 + 33.9*log10(fc_MHz) - 13.82*log10(hTx_m) - a_hRx ...
+            + (44.9 - 6.55*log10(hTx_m)) .* log10(dist_km) + 3;
 
-% Usar FSPL como valor de Prx_dBm de trabajo hasta tener Longley-Rice
-Prx_dBm = Prx_dBm_FSPL;
+    Prx_dBm    = EIRP_dBm + Grx_dBi - PL_dB;
+    Prx_dBm    = Prx_dBm(:);
+    modelo_usado = 'COST-231-Hata';
+end
 
-fprintf('Prx rango (FSPL): [%.1f, %.1f] dBm\n', min(Prx_dBm), max(Prx_dBm));
+% --- FSPL — cota superior teórica (siempre calculada para referencia) ---
+c       = 3e8;
+dist_m  = sqrt( ((lons_flat - lon0) .* 111000 .* cosd(lat0)).^2 + ...
+                ((lats_flat - lat0) .* 111000).^2 );
+dist_m  = max(dist_m, 1);
+FSPL_dB       = 20*log10(dist_m) + 20*log10(fc_Hz) + 20*log10(4*pi/c);
+Prx_dBm_FSPL  = EIRP_dBm + Grx_dBi - FSPL_dB;
+
+fprintf('Modelo activo  : %s\n',        modelo_usado);
+fprintf('Prx rango      : [%.1f, %.1f] dBm\n', min(Prx_dBm), max(Prx_dBm));
+fprintf('Prx FSPL (ref) : [%.1f, %.1f] dBm\n', min(Prx_dBm_FSPL), max(Prx_dBm_FSPL));
 
 %% =========================================================================
 %  BLOQUE 5: CÁLCULO DEL RSRP (Reference Signal Received Power)
@@ -284,8 +303,12 @@ params.lat_emplazamiento = lat0;
 params.lon_emplazamiento = lon0;
 params.area_km           = areaKm;
 params.espaciado_grid_m  = gridSpacing_m;
-params.modelo_propagacion = 'FSPL';  % Cambiar a 'Longley-Rice' cuando se implemente
-params.datos_elevacion    = 'plano'; % Cambiar a 'SRTM_30m' cuando se cargue el .tif
+params.modelo_propagacion = modelo_usado;   % Asignado automáticamente en Block 4
+if tiene_srtm
+    params.datos_elevacion = 'SRTM_30m';
+else
+    params.datos_elevacion = 'plano';
+end
 
 % Nombre descriptivo de la simulación
 nombre_sim = sprintf('URJC_Fuenlabrada_%.1fGHz_%ddBm', fc_Hz/1e9, Ptx_dBm);
