@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { HeaderComponent } from './components/header/header.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { MapComponent } from './components/map/map.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
+import { SimulationService } from './services/simulation.service';
 
 @Component({
   selector: 'app-root',
@@ -41,6 +42,11 @@ import { InfoPanelComponent } from './components/info-panel/info-panel.component
     }
   `]
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   title = 'Gemelo Digital 5G';
+  private simulationService = inject(SimulationService);
+
+  ngOnInit(): void {
+    this.simulationService.loadSimulations();
+  }
 }

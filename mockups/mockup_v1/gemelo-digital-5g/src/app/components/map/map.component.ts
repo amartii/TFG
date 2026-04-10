@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SimulationService } from '../../services/simulation.service';
 import * as L from 'leaflet';
+import 'leaflet.heat';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -122,58 +123,34 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   private updateHeatmap(points: { latitude: number; longitude: number; rsrp_dbm: number }[]): void {
-    // Remover capa anterior
     if (this.heatmapLayer) {
       this.map.removeLayer(this.heatmapLayer);
+      this.heatmapLayer = null;
     }
 
     if (!this.heatmapVisible || points.length === 0) return;
 
-    // Preparar datos para heatmap
+    // leaflet.heat usa un único Canvas — sin problema con miles de puntos
     const heatData: [number, number, number][] = points.map(p => [
       p.latitude,
       p.longitude,
       this.simulationService.normalizeRsrp(p.rsrp_dbm)
     ]);
 
-    // Crear capa de heatmap usando Canvas
-    this.heatmapLayer = this.createCanvasHeatmap(heatData);
-    this.heatmapLayer.addTo(this.map);
-  }
-
-  private createCanvasHeatmap(data: [number, number, number][]): L.Layer {
-    // Crear una capa de círculos como heatmap simplificado
-    const layerGroup = L.layerGroup();
-
-    data.forEach(([lat, lon, intensity]) => {
-      const color = this.getHeatColor(intensity);
-      const circle = L.circleMarker([lat, lon], {
-        radius: 8,
-        fillColor: color,
-        fillOpacity: 0.6,
-        color: color,
-        weight: 0,
-        opacity: 0.8
-      });
-
-      circle.on('click', () => {
-        const rsrp = (intensity * 100) - 140;
-        const point = { latitude: lat, longitude: lon, rsrp_dbm: rsrp };
-        this.simulationService.selectPoint(point);
-      });
-
-      layerGroup.addLayer(circle);
+    this.heatmapLayer = (L as any).heatLayer(heatData, {
+      radius: 18,
+      blur: 15,
+      maxZoom: 17,
+      max: 1.0,
+      gradient: {
+        0.0:  '#ef4444',   // Débil    (< -100 dBm)
+        0.4:  '#f97316',   // Aceptable(-100..-85)
+        0.55: '#fbbf24',   // Bueno   (-85..-70)
+        0.7:  '#10b981'    // Excelente(> -70 dBm)
+      }
     });
 
-    return layerGroup;
-  }
-
-  private getHeatColor(intensity: number): string {
-    // Gradiente: rojo -> naranja -> amarillo -> verde
-    if (intensity >= 0.7) return '#10b981'; // Excelente
-    if (intensity >= 0.55) return '#fbbf24'; // Bueno
-    if (intensity >= 0.4) return '#f97316'; // Aceptable
-    return '#ef4444'; // Débil
+    this.heatmapLayer.addTo(this.map);
   }
 
   private updateTxMarker(location: { latitude: number; longitude: number }): void {

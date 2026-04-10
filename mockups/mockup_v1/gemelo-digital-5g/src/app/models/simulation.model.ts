@@ -5,6 +5,54 @@ export interface Simulation {
   coverage_points: CoveragePoint[];
 }
 
+// ── DTOs del backend Spring Boot ──────────────────────────────────────────────
+
+export interface ApiSimulationSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  metadata: SimulationMetadata;
+}
+
+export interface ApiCoveragePoint {
+  lat: number;
+  lng: number;
+  rsrp: number;
+}
+
+export interface ApiSimulationParameters {
+  area_km: number;
+  espaciado_grid_m: number;
+  [key: string]: unknown;
+}
+
+export interface ApiSimulation {
+  id: string;
+  name: string;
+  createdAt: string;
+  metadata: SimulationMetadata;
+  parameters: ApiSimulationParameters;
+  coveragePoints: ApiCoveragePoint[];
+}
+
+/** Mapea el formato del backend al modelo interno de la app */
+export function apiToSimulation(api: ApiSimulation): Simulation {
+  return {
+    simulation_id: api.id,
+    metadata: api.metadata,
+    coverage_area: {
+      width_km:       api.parameters?.area_km ?? 3,
+      height_km:      api.parameters?.area_km ?? 3,
+      grid_spacing_m: api.parameters?.espaciado_grid_m ?? 50
+    },
+    coverage_points: api.coveragePoints.map(p => ({
+      latitude:  p.lat,
+      longitude: p.lng,
+      rsrp_dbm:  p.rsrp
+    }))
+  };
+}
+
 export interface SimulationMetadata {
   frequency_ghz: number;
   tx_power_dbm: number;
