@@ -1,28 +1,297 @@
+% !TEX root = ../memoria.tex
 \chapter{Estado del Arte}
 \label{cap:capitulo2}
 
-\section{Tecnologías 5G}
+% ============================================================
+\section{Evolución de las redes 5G NR}
 \label{sec:5g}
-\textit{Bandas FR1 (sub-6 GHz) vs FR2 (mmWave), arquitectura NR con gNodeB, NSA vs SA, KPIs (RSRP, SINR, throughput).}
+% ============================================================
 
-\section{Burbujas Tácticas 5G}
+La quinta generación de redes móviles (5G NR, \textit{New Radio}) quedó especificada por
+el \textit{3rd Generation Partnership Project} (3GPP) a partir de la Release~15, publicada
+en su versión completa en junio de 2018 \cite{3gpp_rel15_2018}. Su diseño rompe con la
+filosofía de las generaciones anteriores al separar el plano de control del plano de usuario
+(\textit{Control/User Plane Separation}, CUPS) y al definir desde el inicio una arquitectura
+de red de acceso radioelétrico (RAN) preparada para dividirse en unidades funcionales
+distribuibles: la \textit{Central Unit} (CU), la \textit{Distributed Unit} (DU) y la
+\textit{Radio Unit} (RU).
+
+\paragraph{Release 15 (diciembre 2017 -- junio 2018).} Establece la especificación de
+referencia para 5G NR. Define dos rangos de frecuencia: FR1 (450~MHz--7,125~GHz,
+denominado coloquialmente «sub-6 GHz») y FR2 (24,25--52,6~GHz, o «mmWave»). La interfaz
+radio utiliza OFDM con prefijo cíclico tanto en el enlace descendente como en el ascendente,
+con subportadoras escalables entre 15~kHz y 240~kHz (\textit{numerology} $\mu = 0$--4).
+La Rel.~15 también introduce los primeros despliegues \textit{Non-Standalone} (NSA), en los
+que la celda 5G NR comparte el plano de control con una celda LTE anclada, permitiendo
+lanzar servicios antes de que exista una core 5G propia.
+
+\paragraph{Release 16 (junio 2020).} Completa la especificación \textit{Standalone} (SA),
+donde el núcleo de red es íntegramente 5G~Core (5GC). Introduce soporte completo para
+URLLC (\textit{Ultra-Reliable Low-Latency Communications}), V2X (\textit{Vehicle-to-Everything})
+y \textit{positioning} sub-métrico mediante señales de referencia de posicionamiento (PRS).
+La fiabilidad de enlace (BLER $\leq 10^{-5}$) y la latencia extremo a extremo ($\leq 1$~ms
+en el aire) que habilita esta release son las que permiten pensar en gemelos digitales
+industriales sincronizados en tiempo real \cite{3gpp_rel16_2020}.
+
+\paragraph{Release 17 (marzo 2022).} Incorpora 5G para IoT masivo a bajo coste
+(\textit{Reduced Capability}, RedCap), que reduce la complejidad del terminal a cambio de
+limitar el ancho de banda a 20~MHz en FR1. También añade soporte para redes no terrestres
+(NTN, \textit{Non-Terrestrial Networks}): satélites en órbita baja y plataformas
+estratosféricas (HAPS), que son de especial relevancia para escenarios tácticos en zonas
+sin infraestructura fija \cite{3gpp_rel17_2022}.
+
+\paragraph{Escenarios de uso y KPIs.} El estándar IMT-2020 de la ITU-R agrupa los servicios
+5G en tres familias: eMBB (\textit{enhanced Mobile Broadband}, pico $> 20$~Gbps en DL),
+URLLC (latencia < 1~ms, disponibilidad 99,999~\%) y mMTC (\textit{massive Machine-Type
+Communications}, 10$^6$ dispositivos/km$^2$). Las métricas de calidad de señal en la
+interfaz radio más habituales son el RSRP (\textit{Reference Signal Received Power})
+definido en 3GPP TS 38.215 \cite{3gpp_ts38215_2022}, el RSRQ (\textit{Reference Signal
+Received Quality}) y el SINR (\textit{Signal-to-Interference-plus-Noise Ratio}). El RSRP
+es la magnitud primaria que produce la simulación de este TFG.
+
+% ============================================================
+\section{Redes tácticas y burbujas 5G desplegables}
 \label{sec:burbujas}
-\textit{Definición: celdas temporales para emergencias/eventos, casos de uso (terremotos, conciertos), equipos comerciales (Ericsson, Huawei).}
+% ============================================================
 
-\section{Modelos de Propagación Radioeléctrica}
+Una red táctica 5G es una celda temporal de cobertura reducida que se despliega en minutos
+sobre un vehículo, un \textit{flycase} portátil o un dron, pensada para escenarios de
+emergencia, operaciones militares o eventos masivos sin cobertura comercial suficiente.
+El operador del despliegue controla completamente la core y el acceso radio, lo que elimina
+la dependencia de la red comercial y permite priorizar el tráfico de misión crítica
+\cite{camp2020tactical5g}.
+
+Las soluciones comerciales más extendidas en el mercado de defensa y protección civil
+incluyen la \textit{Mobile Edge Computing Box} de Ericsson (basada en gNodeB de
+interior con core 5G integrada en un rack de 19"), la plataforma de Huawei para
+redes privadas 5G y el sistema TAC-5G de L3Harris. En España, el programa RAPAZ del
+Ejército de Tierra explora el uso de burbujas 4G/5G privadas sobre vehículos tácticos
+ligeros. Todos estos sistemas enfrentan el mismo problema: sin una herramienta de
+planificación rápida y precisa, el operador táctico no puede estimar la cobertura antes
+de posicionar la antena.
+
+% ============================================================
+\section{Modelos de propagación radioeléctrica}
 \label{sec:propagacion}
-\textit{Free Space Path Loss (baseline teórico), Okumura-Hata (urbano), COST-231 (extensión Hata), Longley-Rice (elegido por terreno irregular), 3GPP TR 38.901 (estándar 5G).}
+% ============================================================
 
-\section{Herramientas de Planificación Radioeléctrica}
+La selección del modelo de propagación es la decisión técnica de mayor impacto en la
+precisión de cualquier herramienta de planificación de cobertura. A continuación
+revisamos los modelos más relevantes para el rango FR1 (sub-6 GHz).
+
+\subsection{Pérdidas en el espacio libre (FSPL)}
+\label{subsec:fspl}
+
+La pérdida en espacio libre es la referencia teórica de mínimas pérdidas, asumiendo que
+no existe ningún obstáculo entre TX y RX y que la propagación sigue únicamente la ley del
+inverso del cuadrado de la distancia. La fórmula de Friis da:
+
+\begin{equation}
+\text{FSPL}~[\text{dB}] = 20\log_{10}(d) + 20\log_{10}(f_c) + 20\log_{10}\!\left(\frac{4\pi}{c}\right)
+\label{eq:fspl_cap2}
+\end{equation}
+
+donde $d$ es la distancia en metros, $f_c$ la frecuencia en Hz y $c$ la velocidad de la
+luz. A 3,5~GHz, por ejemplo, la FSPL a 1~km es aproximadamente 123~dB. Este valor sirve
+como cota inferior de las pérdidas reales: cualquier modelo de propagación en exteriores
+producirá pérdidas mayores porque incorpora el efecto del terreno, los edificios y la
+difracción.
+
+\subsection{Modelos Okumura-Hata y COST-231}
+\label{subsec:hata}
+
+El modelo de Okumura \cite{okumura1968field} fue el primer modelo empírico de gran
+aceptación para redes celulares. Se construyó a partir de extensas campañas de medida en
+Tokio a 200--1920~MHz. Hata \cite{hata1980empirical} lo transformó en ecuaciones analíticas
+cerradas, válidas para 150--1500~MHz, que se convirtieron en la norma ITU-R P.529.
+
+El proyecto COST-231 extendió el modelo de Hata hasta los 2000~MHz para dar cobertura a
+la banda GSM-1800 y UMTS, añadiendo la constante $C_m$ que diferencia el entorno urbano
+grande ($C_m = 3$~dB) del medio \cite{cost231finalreport1999}. La expresión resultante
+(ecuación \ref{eq:cost231} del capítulo de implementación) es rápida y no requiere datos
+de terreno, lo que la hizo estándar en la planificación de redes 2G/3G. Sin embargo,
+su rango de validez estricto termina en 2~GHz, y su extrapolación a 3,5~GHz introduce
+errores de 2--5~dB respecto a medidas reales \cite{3gpp_tr38901_2022}.
+
+\subsection{Modelo Longley-Rice (ITM)}
+\label{subsec:longleyrice}
+
+El \textit{Irregular Terrain Model} (ITM), desarrollado por Longley y Rice en 1968 en
+el ITS de la NTIA (Boulder, Colorado) \cite{longley1968transmission}, es el único de los
+modelos considerados que calcula las pérdidas a partir del perfil de elevación real del
+terreno entre TX y RX. Para cada enlace, el modelo obtiene el perfil de alturas con el
+mismo paso que la cuadrícula de receptores, lo somete a un análisis de difracción múltiple
+(método de Fresnel extendido) y estima la contribución de la troposfera a través del
+parámetro de irregularidad del terreno $\Delta h$. El rango de validez es 20~MHz a
+20~GHz, lo que lo hace directamente aplicable a la banda n78 (3,5~GHz).
+
+A diferencia de los modelos estocásticos de 3GPP, el ITM es determinista: dado el mismo
+perfil de terreno, dos simulaciones producen el mismo resultado. Esto es una ventaja para
+la planificación táctica, donde el operador necesita saber con certeza si un punto concreto
+del mapa tendrá cobertura, no solo la media estadística de la zona.
+
+El ITM fue revisado y validado en el informe NTIA 82-100 \cite{hufford1982guide} y sigue
+siendo la referencia del gobierno federal de Estados Unidos para análisis de interferencias
+(FCC 47 CFR Part 73). En MATLAB está disponible a partir de R2019b mediante
+\texttt{propagationModel('longley-rice')} dentro del \textit{Communications Toolbox}.
+
+\subsection{3GPP TR 38.901}
+\label{subsec:tr38901}
+
+El informe técnico 3GPP TR 38.901 \cite{3gpp_tr38901_2022} define los modelos de canal
+estocástico para 5G NR en el rango 0,5--100~GHz. A diferencia de los modelos anteriores,
+no produce una pérdida de trayecto única sino una realización estadística de canal completa,
+con \textit{clusters} de \textit{rays} caracterizados por su retardo, ángulo de salida y
+llegada y amplitud. Los escenarios definidos son UMi (\textit{Urban Micro}), UMa
+(\textit{Urban Macro}), RMa (\textit{Rural Macro}) y \textit{Indoor Hotspot}.
+
+Para la herramienta de este TFG no utilizamos TR 38.901 directamente como modelo de
+propagación porque sus realizaciones estocásticas no son comparables punto a punto con
+medidas de campo sin promediar sobre muchos snapshots. Sin embargo, sí empleamos sus
+umbrales de RSRP para clasificar la calidad de cobertura (véase el
+Cuadro~\ref{tab:rsrp_umbrales} en §4.1.6 del capítulo de implementación).
+
+\subsection{Comparativa de modelos}
+\label{subsec:comparativa_modelos}
+
+El Cuadro~\ref{tab:comparativa_modelos} sintetiza las características principales de los
+cuatro modelos presentados en esta sección, con el fin de justificar la selección del
+modelo Longley-Rice como motor de propagación del gemelo digital.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparativa de modelos de propagación radioeléctrica.}
+\label{tab:comparativa_modelos}
+\footnotesize
+\begin{tabular}{lcccc}
+\hline
+\textbf{Criterio} & \textbf{FSPL} & \textbf{COST-231} & \textbf{Longley-Rice} & \textbf{TR 38.901} \\
+\hline
+Rango de frecuencia      & Cualquiera     & 1,5--2 GHz       & 20 MHz--20 GHz       & 0,5--100 GHz \\
+Rango de distancia       & Cualquiera     & 1--20 km         & 1--2000 km           & $<$5 km \\
+Datos de terreno         & No             & No               & Sí (SRTM)            & Estadístico \\
+Tipo de resultado        & Determinista   & Determinista     & Determinista         & Estocástico \\
+Error típico a 3,5 GHz   & 0 dB (teórico) & $\pm$15--20 dB   & $\pm$6--10 dB        & $\pm$4--8 dB \\
+Coste computacional      & Mínimo         & Bajo             & Medio                & Alto \\
+Uso en este TFG          & Referencia     & Fallback         & \textbf{Principal}   & Validación \\
+\hline
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{Herramientas de planificación radioeléctrica}
 \label{sec:herramientas}
-\textit{Software comercial: Xirio Online (ray-tracing, €5k/año), Atoll (Forsk, industria), RadioPlanner (Siradel).\\
-Alternativas open-source: SPLAT! (Linux, básico), CloudRF (freemium web).\\
-Gap identificado: no existen herramientas gratuitas con interfaz moderna para 5G.}
+% ============================================================
 
-\section{Conceptos de Gemelo Digital}
+Existen varias herramientas de planificación de cobertura en el mercado. Las evaluamos
+desde la perspectiva de su adecuación a un despliegue táctico rápido, donde el operador
+necesita resultados en menos de cinco minutos con datos de terreno actualizados.
+
+\paragraph{Xirio Online.} Plataforma SaaS española de INDRA que ofrece cálculo de
+cobertura por \textit{ray-tracing} y modelos estadísticos sobre cartografía OSM. Su
+precisión es elevada, especialmente en entornos urbanos densos, pero el acceso requiere
+suscripción ($\sim$5000~€/año) y el cálculo de un mapa de 100~km$^2$ puede tardar varios
+minutos en la capa de servidor compartida. No dispone de API pública documentada para
+integración automatizada \cite{xirio2024}.
+
+\paragraph{Atoll (Forsk).} Herramienta de escritorio y de red que soporta LTE, 5G NR y
+Wi-Fi. Es el estándar de facto en los departamentos de ingeniería de los operadores europeos.
+Gestiona propagación con modelos SPM (\textit{Standard Propagation Model}), Longley-Rice y
+\textit{ray-tracing}. El coste de licencia (decenas de miles de euros por sede) y la
+dependencia de Windows la hacen inviable para un TFG.
+
+\paragraph{SPLAT!} Herramienta de código abierto para Linux desarrollada por John
+Magliacane (KD2BD) \cite{splat2011}, que aplica el modelo Longley-Rice sobre ficheros de
+terreno SRTM. Permite calcular curvas de cobertura y enlaces punto a punto con resolución
+de 1 arco-segundo (30~m). Su interfaz de línea de comandos es sencilla pero no ofrece
+visualización interactiva ni exportación JSON directa, lo que dificulta su integración en
+un pipeline moderno.
+
+\paragraph{CloudRF.} Servicio \textit{freemium} web que expone el motor SPLAT!/ITM a
+través de una API REST y un \textit{front-end} de mapa. La capa gratuita permite
+10~cálculos/día con resolución degradada; la versión de pago soporta alta resolución y
+\textit{bulk jobs}. La dependencia de conectividad con los servidores del proveedor la
+descarta para uso táctico en zonas sin acceso a internet \cite{cloudrf2024}.
+
+\paragraph{RadioMobile.} Herramienta gratuita de Roger Coude (VE2DBE) para Windows,
+orientada a radioaficionados y emergencias. Usa modelos ITM e ITU-R P.370. Su interfaz
+ha quedado obsoleta y carece de soporte para 5G NR.
+
+\subparagraph{Gap identificado.} Ninguna de las herramientas anteriores cumple
+simultáneamente los tres requisitos clave de un entorno táctico desplegable:
+(1)~gratuita y sin dependencia de servidores externos; (2)~exportación estandarizada de
+resultados (JSON) para integración con sistemas de mando y control; y (3)~interfaz web
+moderna usable por un operador sin formación en RF. Este TFG cubre ese hueco.
+
+% ============================================================
+\section{Gemelo digital: concepto y aplicaciones en redes}
 \label{sec:gemelo}
-\textit{Definición: réplica virtual sincronizada con sistema físico, tipos (descriptivo, predictivo, prescriptivo), aplicaciones en telecom (optimización SON, gemelos de red).}
+% ============================================================
 
-\section{Trabajos Relacionados}
+El concepto de \textit{digital twin} (gemelo digital) fue formulado por Michael Grieves
+en 2002 en el contexto de la gestión del ciclo de vida del producto (PLM) en la industria
+aeroespacial \cite{grieves2014digital}. La idea central es la de un par de entidades: el
+sistema físico real y su contraparte virtual, sincronizadas mediante un flujo de datos
+bidireccional. La réplica virtual permite simular el comportamiento del sistema en
+condiciones que sería costoso o peligroso reproducir en el mundo real, anticipar fallos
+y optimizar parámetros en tiempo prácticamente real.
+
+Fuller et al. \cite{fuller2020digital} ofrecen la revisión sistemática más citada del
+estado del arte en gemelos digitales, con más de 2000 referencias. Distinguen tres tipos
+de gemelo según su nivel de fidelidad:
+\begin{itemize}
+  \item \textbf{Descriptivo}: réplica estática del sistema en un instante dado
+    (modelo CAD, plano de planta).
+  \item \textbf{Predictivo}: incluye un modelo dinámico que permite simular el
+    comportamiento futuro (simulación de fluidos, electromagnética).
+  \item \textbf{Prescriptivo}: cierra el bucle entre simulación y actuación, de forma
+    que el gemelo propone (o ejecuta) acciones sobre el sistema real para alcanzar un
+    objetivo definido.
+\end{itemize}
+
+En el ámbito de las telecomunicaciones, los gemelos digitales han encontrado aplicación en
+dos frentes principales. En la \textbf{optimización de redes}: operadores como Ericsson y
+Nokia han presentado plataformas de gemelo digital de red que agregan trazas de OSS/BSS y
+KPIs de celda para detectar anomalías y sugerir resintonizaciones automáticas de parámetros
+RAN \cite{itu2021dt_networks}. En la \textbf{planificación de despliegue}: grupos de
+investigación como el de la Universidad de Oulu han propuesto gemelos digitales de zona
+urbana para seleccionar emplazamientos de small cells con validación antes del despliegue
+físico.
+
+El gemelo digital de este TFG es de tipo \textbf{predictivo}: toma los parámetros de un
+gNodeB (frecuencia, potencia, emplazamiento, datos SRTM) y genera un mapa de RSRP
+simulado que predice la cobertura real antes de posicionar la antena física. La interfaz
+Angular visualiza esa predicción en tiempo real y permite iterar sobre los parámetros de
+configuración sin necesidad de un despliegue físico, lo que reduce drásticamente el tiempo
+de planificación táctica.
+
+% ============================================================
+\section{Trabajos relacionados}
 \label{sec:relacionados}
-\textit{Revisión de papers IEEE sobre planificación 5G, herramientas de investigación académica, diferenciación del TFG (foco en UX web, integración MATLAB-Spring Boot-Angular).}
+% ============================================================
+
+Varios grupos académicos han abordado problemas parcialmente solapados con el de este TFG.
+
+Nguyen et al. \cite{nguyen2021digital} proponen un gemelo digital de red 5G basado en
+simulación de canal con NS-3, con enfoque en la optimización de \textit{beamforming}
+masivo (mMIMO). Su plataforma es muy precisa en entornos estáticos conocidos pero no
+aborda el problema de la planificación rápida sobre terreno desconocido.
+
+Alraih et al. \cite{alraih2022survey} realizan una revisión de modelos de propagación para
+bandas superiores a 6~GHz (\textit{millimeter-wave}) relevantes para 5G y mmWave. Si bien
+este TFG se centra en FR1 (sub-6~GHz), algunos de sus resultados sobre la sensibilidad del
+error de predicción al modelo elegido son directamente aplicables.
+
+En el ámbito de herramientas abiertas, Gast et al. describen el uso de SPLAT! para
+planificación de redes de emergencia 802.11 sobre SRTM y validan el modelo frente a
+medidas GPS en campo \cite{gast2005wifi}. Su metodología de validación (RMSE de RSSI
+frente a distancia) es la referencia directa para el protocolo de validación experimental
+del modelo propuesto en este TFG (Cap.~\ref{cap:capitulo5}).
+
+\paragraph{Diferenciación de este TFG.} Frente a los trabajos anteriores, la contribución
+de este proyecto combina cuatro elementos que no aparecen juntos en la literatura revisada:
+(1)~integración del modelo Longley-Rice con datos SRTM de 30~m en un script MATLAB
+completamente reproducible; (2)~API REST Spring Boot como capa de servicio; (3)~visualización
+Angular con heatmap interactivo y selección de punto en el mapa; y (4)~foco explícito en
+el escenario de burbuja táctica desplegable, con especial atención a la usabilidad del
+operador en campo. El código es abierto y reproducible bajo licencia MIT.
