@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SimulationService } from '../../services/simulation.service';
 import { ComparisonService, DifferencePoint } from '../../services/comparison.service';
+import { MapTileService } from '../../services/map-tile.service';
 import * as L from 'leaflet';
 import 'leaflet.heat';
 
@@ -31,20 +32,58 @@ L.Icon.Default.mergeOptions({
         </div>
       </div>
 
-      <!-- Leyenda de diferencia (solo en modo difference) -->
-      @if (comparisonService.active() && comparisonService.mode() === 'difference' && comparisonService.simulationB()) {
-        <div class="map-overlay map-overlay--bottom-right">
-          <div class="diff-legend">
-            <span class="diff-legend__title">ΔdB (A − B)</span>
-            <div class="diff-legend__bar"></div>
-            <div class="diff-legend__labels">
-              <span>B mejor</span>
-              <span>≈ Igual</span>
-              <span>A mejor</span>
+      <!-- Stack inferior derecho: leyenda de diferencia + selector de tema -->
+      <div class="map-overlay map-overlay--bottom-right">
+        <div class="bottom-right-stack">
+          @if (comparisonService.active() && comparisonService.mode() === 'difference' && comparisonService.simulationB()) {
+            <div class="diff-legend">
+              <span class="diff-legend__title">ΔdB (A − B)</span>
+              <div class="diff-legend__bar"></div>
+              <div class="diff-legend__labels">
+                <span>B mejor</span>
+                <span>≈ Igual</span>
+                <span>A mejor</span>
+              </div>
+            </div>
+          }
+
+          <div class="theme-selector" [title]="mapTileService.current().description">
+            <span class="theme-selector__label">Tema</span>
+            <div class="theme-selector__options">
+              @for (theme of mapTileService.themes; track theme.id) {
+                <button
+                  class="theme-btn"
+                  [class.theme-btn--active]="theme.id === mapTileService.current().id"
+                  [title]="theme.name + ' — ' + theme.description"
+                  (click)="mapTileService.setTheme(theme.id)">
+                  @switch (theme.id) {
+                    @case ('osm') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                        <line x1="8" y1="2" x2="8" y2="18"/>
+                        <line x1="16" y1="6" x2="16" y2="22"/>
+                      </svg>
+                    }
+                    @case ('satellite') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      </svg>
+                    }
+                    @case ('terrain') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 20l5-9 4 7 3-5 6 7H3z"/>
+                        <circle cx="17" cy="6" r="2"/>
+                      </svg>
+                    }
+                  }
+                </button>
+              }
             </div>
           </div>
         </div>
-      }
+      </div>
 
       <!-- Controles adicionales -->
       <div class="map-overlay map-overlay--bottom-left">
@@ -80,19 +119,23 @@ L.Icon.Default.mergeOptions({
 export class MapComponent implements OnInit, OnDestroy {
   private simulationService = inject(SimulationService);
   comparisonService = inject(ComparisonService);
+  mapTileService = inject(MapTileService);
   private map!: L.Map;
+  private tileLayer?: L.Layer;
   private heatmapLayer: any;
   private heatmapLayerB: any;
   private diffLayerGroup?: L.LayerGroup;
   private txMarker?: L.Marker;
   private txMarkerB?: L.Marker;
   private heatmapVisible = true;
+  private lastSimId: string | null = null;
+  private resizeObserver?: ResizeObserver;
 
   currentLat?: number;
   currentLon?: number;
 
   constructor() {
-    // Effect principal: heatmap A
+    // Effect principal: heatmap A + centrado en TX cuando cambia la simulación
     effect(() => {
       const points = this.simulationService.filteredCoveragePoints();
       const simulation = this.simulationService.currentSimulation();
@@ -102,6 +145,28 @@ export class MapComponent implements OnInit, OnDestroy {
         this.updateTxMarker(simulation.metadata.tx_location);
         this.currentLat = simulation.metadata.tx_location.latitude;
         this.currentLon = Math.abs(simulation.metadata.tx_location.longitude);
+
+        // Centrar el mapa en la antena TX solo cuando cambia la simulación
+        // (no en cada cambio de threshold, que también dispara el effect)
+        if (simulation.simulation_id !== this.lastSimId) {
+          this.lastSimId = simulation.simulation_id;
+          this.map.setView(
+            [simulation.metadata.tx_location.latitude, simulation.metadata.tx_location.longitude],
+            14
+          );
+        }
+      }
+    });
+
+    // Effect: cambio de tema del mapa → reemplaza el tile layer
+    effect(() => {
+      const theme = this.mapTileService.current();
+      if (this.map) {
+        if (this.tileLayer) {
+          this.map.removeLayer(this.tileLayer);
+        }
+        this.tileLayer = this.mapTileService.createTileLayer(theme.id);
+        this.tileLayer.addTo(this.map);
       }
     });
 
@@ -165,6 +230,7 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
     if (this.map) {
       this.map.remove();
     }
@@ -178,11 +244,8 @@ export class MapComponent implements OnInit, OnDestroy {
       attributionControl: true
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(this.map);
+    this.tileLayer = this.mapTileService.createTileLayer();
+    this.tileLayer.addTo(this.map);
 
     // Click en el mapa → seleccionar punto más cercano
     this.map.on('click', (e: L.LeafletMouseEvent) => {
@@ -208,6 +271,23 @@ export class MapComponent implements OnInit, OnDestroy {
       this.updateTxMarker(simulation.metadata.tx_location);
       this.currentLat = simulation.metadata.tx_location.latitude;
       this.currentLon = Math.abs(simulation.metadata.tx_location.longitude);
+      this.map.setView(
+        [simulation.metadata.tx_location.latitude, simulation.metadata.tx_location.longitude],
+        14
+      );
+      this.lastSimId = simulation.simulation_id;
+    }
+
+    // Forzar a Leaflet a recalcular dimensiones cuando el contenedor llegue a su tamaño final.
+    // Necesario al volver desde la vista de comparación: Leaflet "cachea" el tamaño al
+    // crear el mapa y los tiles solo se cargan en el área inicial → línea invisible que
+    // corta el heatmap si el contenedor crece después.
+    requestAnimationFrame(() => this.map?.invalidateSize());
+
+    const container = document.getElementById('map');
+    if (container && typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.map?.invalidateSize());
+      this.resizeObserver.observe(container);
     }
   }
 

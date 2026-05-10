@@ -13,7 +13,7 @@
 
 .map-overlay {
   position: absolute;
-  z-index: $z-dropdown;
+  z-index: 1100; // Por encima de los panes y controles de Leaflet (1000)
   pointer-events: none;
 
   > * {
@@ -25,6 +25,11 @@
     right: $spacing-md;
   }
 
+  &--top-left {
+    top: $spacing-md;
+    left: $spacing-md;
+  }
+
   &--bottom-left {
     bottom: $spacing-xl;
     left: $spacing-md;
@@ -33,6 +38,80 @@
   &--bottom-right {
     bottom: $spacing-xl;
     right: $spacing-md;
+  }
+}
+
+// ── Stack inferior derecho: leyenda diff + selector de tema ──────────────────
+
+.bottom-right-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: $spacing-sm;
+}
+
+// ── Selector de tema del mapa ────────────────────────────────────────────────
+
+.theme-selector {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: 6px 10px;
+  background: rgba($color-bg-card, 0.95);
+  border: 1px solid var(--border);
+  border-radius: $border-radius-md;
+  backdrop-filter: blur(8px);
+
+  &__label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: $font-weight-semibold;
+  }
+
+  &__options {
+    display: flex;
+    gap: 4px;
+  }
+}
+
+.theme-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: $border-radius-sm;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all $transition-fast;
+  padding: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    transition: color $transition-fast;
+  }
+
+  &:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-hover);
+
+    svg {
+      color: var(--accent-primary);
+    }
+  }
+
+  &--active {
+    border-color: var(--accent-primary);
+    background: rgba($color-accent-primary, 0.15);
+
+    svg {
+      color: var(--accent-primary);
+    }
   }
 }
 
