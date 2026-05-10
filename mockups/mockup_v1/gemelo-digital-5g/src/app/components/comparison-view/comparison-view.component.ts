@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, effect, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, effect, computed, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { SimulationService } from '../../services/simulation.service';
 import { ComparisonService } from '../../services/comparison.service';
+import { MapTileService } from '../../services/map-tile.service';
 import { RSRP_LEVELS } from '../../models/simulation.model';
 import * as L from 'leaflet';
 import 'leaflet.heat';
@@ -33,7 +34,30 @@ import 'leaflet.heat';
             <span class="badge badge--a">A</span>
             <span class="map-panel__name">{{ simAName() }}</span>
           </div>
-          <div id="comparison-map-a" class="map-panel__map"></div>
+          <div class="map-panel__map-wrap">
+            <div id="comparison-map-a" class="map-panel__map"></div>
+            <div class="cmp-theme-selector">
+              @for (theme of mapTileService.themes; track theme.id) {
+                <button
+                  class="cmp-theme-btn"
+                  [class.cmp-theme-btn--active]="theme.id === themeIdA()"
+                  [title]="theme.name + ' — ' + theme.description"
+                  (click)="setThemeA(theme.id)">
+                  @switch (theme.id) {
+                    @case ('osm') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    }
+                    @case ('satellite') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    }
+                    @case ('terrain') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20l5-9 4 7 3-5 6 7H3z"/><circle cx="17" cy="6" r="2"/></svg>
+                    }
+                  }
+                </button>
+              }
+            </div>
+          </div>
           <div class="map-panel__stats">
             @if (statsA()) {
               <div class="mini-stat"><span class="mini-stat__val font-mono">{{ statsA()!.avg | number:'1.1-1' }}</span><span class="mini-stat__lbl">dBm medio</span></div>
@@ -56,23 +80,27 @@ import 'leaflet.heat';
                 <span class="delta-display__value">{{ diffStats()!.avgDelta > 0 ? '+' : '' }}{{ diffStats()!.avgDelta | number:'1.1-1' }}</span>
                 <span class="delta-display__unit">dB medio</span>
               </div>
-              <div class="delta-range">
-                <div class="delta-range__item">
-                  <span class="delta-range__label">Máx Δ</span>
-                  <span class="delta-range__value font-mono" style="color:#f97316">+{{ diffStats()!.maxDelta | number:'1.1-1' }}</span>
+              @if (diffStats()!.hasSpatialOverlap) {
+                <div class="delta-range">
+                  <div class="delta-range__item">
+                    <span class="delta-range__label">Máx Δ</span>
+                    <span class="delta-range__value font-mono" style="color:#f97316">+{{ diffStats()!.maxDelta | number:'1.1-1' }}</span>
+                  </div>
+                  <div class="delta-range__item">
+                    <span class="delta-range__label">Mín Δ</span>
+                    <span class="delta-range__value font-mono" style="color:#3b82f6">{{ diffStats()!.minDelta | number:'1.1-1' }}</span>
+                  </div>
                 </div>
-                <div class="delta-range__item">
-                  <span class="delta-range__label">Mín Δ</span>
-                  <span class="delta-range__value font-mono" style="color:#3b82f6">{{ diffStats()!.minDelta | number:'1.1-1' }}</span>
-                </div>
-              </div>
+              } @else {
+                <div class="dashboard__hint">Sin solapamiento espacial — comparación por estadísticas agregadas</div>
+              }
             } @else {
-              <div class="dashboard__empty">Selecciona simulación B en el sidebar</div>
+              <div class="dashboard__empty">Cargando comparación…</div>
             }
           </div>
 
-          <!-- Ventaja por zona -->
-          @if (diffStats()) {
+          <!-- Ventaja por zona (solo cuando hay solapamiento espacial) -->
+          @if (diffStats() && diffStats()!.hasSpatialOverlap) {
             <div class="dashboard__section">
               <h4 class="dashboard__title">Ventaja por zona</h4>
               <div class="advantage-bars">
@@ -166,7 +194,30 @@ import 'leaflet.heat';
             <span class="badge badge--b">B</span>
             <span class="map-panel__name">{{ simBName() }}</span>
           </div>
-          <div id="comparison-map-b" class="map-panel__map"></div>
+          <div class="map-panel__map-wrap">
+            <div id="comparison-map-b" class="map-panel__map"></div>
+            <div class="cmp-theme-selector">
+              @for (theme of mapTileService.themes; track theme.id) {
+                <button
+                  class="cmp-theme-btn"
+                  [class.cmp-theme-btn--active]="theme.id === themeIdB()"
+                  [title]="theme.name + ' — ' + theme.description"
+                  (click)="setThemeB(theme.id)">
+                  @switch (theme.id) {
+                    @case ('osm') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    }
+                    @case ('satellite') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    }
+                    @case ('terrain') {
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20l5-9 4 7 3-5 6 7H3z"/><circle cx="17" cy="6" r="2"/></svg>
+                    }
+                  }
+                </button>
+              }
+            </div>
+          </div>
           <div class="map-panel__stats">
             @if (statsB()) {
               <div class="mini-stat"><span class="mini-stat__val font-mono">{{ statsB()!.avg | number:'1.1-1' }}</span><span class="mini-stat__lbl">dBm medio</span></div>
@@ -184,14 +235,25 @@ import 'leaflet.heat';
 export class ComparisonViewComponent implements OnInit, OnDestroy {
   private simulationService = inject(SimulationService);
   comparisonService = inject(ComparisonService);
+  mapTileService = inject(MapTileService);
 
   private mapA!: L.Map;
   private mapB!: L.Map;
+  private tileLayerA?: L.Layer;
+  private tileLayerB?: L.Layer;
   private heatLayerA: any;
   private heatLayerB: any;
   private txMarkerA?: L.Marker;
   private txMarkerB?: L.Marker;
-  private syncing = false;
+  private resizeObserver?: ResizeObserver;
+
+  // Tema del mapa independiente para A y B (parten del global, luego cada selector
+  // los modifica de forma autónoma).
+  themeIdA = signal<string>(this.mapTileService.current().id);
+  themeIdB = signal<string>(this.mapTileService.current().id);
+
+  setThemeA(id: string): void { this.themeIdA.set(id); }
+  setThemeB(id: string): void { this.themeIdB.set(id); }
 
   rsrpLevels = RSRP_LEVELS;
 
@@ -226,6 +288,26 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
   });
 
   constructor() {
+    // Effect: cambio de tema del mapa A
+    effect(() => {
+      const themeId = this.themeIdA();
+      if (this.mapA) {
+        if (this.tileLayerA) this.mapA.removeLayer(this.tileLayerA);
+        this.tileLayerA = this.mapTileService.createTileLayer(themeId);
+        this.tileLayerA.addTo(this.mapA);
+      }
+    });
+
+    // Effect: cambio de tema del mapa B (independiente de A)
+    effect(() => {
+      const themeId = this.themeIdB();
+      if (this.mapB) {
+        if (this.tileLayerB) this.mapB.removeLayer(this.tileLayerB);
+        this.tileLayerB = this.mapTileService.createTileLayer(themeId);
+        this.tileLayerB.addTo(this.mapB);
+      }
+    });
+
     effect(() => {
       const simA = this.simA();
       if (this.mapA && simA && simA.coverage_points.length > 0) {
@@ -250,24 +332,21 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
     if (this.mapA) this.mapA.remove();
     if (this.mapB) this.mapB.remove();
   }
 
   private initMaps(): void {
     const center: L.LatLngExpression = [40.2897, -3.8244];
-    const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    const tileOpts: L.TileLayerOptions = { subdomains: 'abcd', maxZoom: 19 };
 
     this.mapA = L.map('comparison-map-a', { center, zoom: 13, zoomControl: false, attributionControl: false });
-    L.tileLayer(tileUrl, tileOpts).addTo(this.mapA);
+    this.tileLayerA = this.mapTileService.createTileLayer(this.themeIdA());
+    this.tileLayerA.addTo(this.mapA);
 
     this.mapB = L.map('comparison-map-b', { center, zoom: 13, zoomControl: false, attributionControl: false });
-    L.tileLayer(tileUrl, tileOpts).addTo(this.mapB);
-
-    // Sync pan/zoom between both maps
-    this.mapA.on('move', () => this.syncMap(this.mapA, this.mapB));
-    this.mapB.on('move', () => this.syncMap(this.mapB, this.mapA));
+    this.tileLayerB = this.mapTileService.createTileLayer(this.themeIdB());
+    this.tileLayerB.addTo(this.mapB);
 
     // Render initial data for A
     const simA = this.simA();
@@ -282,14 +361,27 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
     if (simB && simB.coverage_points.length > 0) {
       this.renderHeatmap(this.mapB, simB.coverage_points, 'B');
       this.renderTxMarker(this.mapB, simB.metadata.tx_location, 'B');
+      const bounds = L.latLngBounds(simB.coverage_points.map(p => [p.latitude, p.longitude] as [number, number]));
+      this.mapB.fitBounds(bounds, { padding: [20, 20] });
     }
-  }
 
-  private syncMap(source: L.Map, target: L.Map): void {
-    if (this.syncing) return;
-    this.syncing = true;
-    target.setView(source.getCenter(), source.getZoom(), { animate: false });
-    this.syncing = false;
+    // Forzar a Leaflet a recalcular dimensiones cuando el host alcance su tamaño final
+    requestAnimationFrame(() => {
+      this.mapA.invalidateSize();
+      this.mapB.invalidateSize();
+    });
+
+    // Recalcular si el contenedor cambia de tamaño (resize ventana, sidebar, etc.)
+    const containerA = document.getElementById('comparison-map-a');
+    const containerB = document.getElementById('comparison-map-b');
+    if (containerA && containerB && typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.mapA?.invalidateSize();
+        this.mapB?.invalidateSize();
+      });
+      this.resizeObserver.observe(containerA);
+      this.resizeObserver.observe(containerB);
+    }
   }
 
   private renderHeatmap(map: L.Map, points: { latitude: number; longitude: number; rsrp_dbm: number }[], which: 'A' | 'B'): void {

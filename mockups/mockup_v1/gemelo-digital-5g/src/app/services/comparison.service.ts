@@ -80,23 +80,48 @@ export class ComparisonService {
     return result;
   });
 
-  // Estadísticas de la diferencia
+  // Estadísticas de la comparación: agregadas siempre que A y B estén cargadas;
+  // si además existe solapamiento espacial, se añade el desglose por zona.
   readonly diffStats = computed(() => {
-    const pts = this.differencePoints();
-    if (pts.length === 0) return null;
-    const deltas = pts.map(p => p.delta);
-    const avg = deltas.reduce((a, b) => a + b, 0) / deltas.length;
-    const aBetter = pts.filter(p => p.delta > 2).length;
-    const bBetter = pts.filter(p => p.delta < -2).length;
-    const similar = pts.filter(p => Math.abs(p.delta) <= 2).length;
+    const simA = this.simulationService.currentSimulation();
+    const simB = this.simulationBData();
+    if (!simA || !simB) return null;
+
+    const rsrpsA = simA.coverage_points.map(p => p.rsrp_dbm);
+    const rsrpsB = simB.coverage_points.map(p => p.rsrp_dbm);
+    if (rsrpsA.length === 0 || rsrpsB.length === 0) return null;
+
+    const avgA = rsrpsA.reduce((a, b) => a + b, 0) / rsrpsA.length;
+    const avgB = rsrpsB.reduce((a, b) => a + b, 0) / rsrpsB.length;
+    const avgDelta = avgA - avgB;
+
+    const matched = this.differencePoints();
+    const hasSpatialOverlap = matched.length > 0;
+
+    if (hasSpatialOverlap) {
+      const deltas = matched.map(p => p.delta);
+      return {
+        avgDelta,
+        maxDelta: Math.max(...deltas),
+        minDelta: Math.min(...deltas),
+        aBetterCount: matched.filter(p => p.delta > 2).length,
+        bBetterCount: matched.filter(p => p.delta < -2).length,
+        similarCount: matched.filter(p => Math.abs(p.delta) <= 2).length,
+        totalMatched: matched.length,
+        hasSpatialOverlap: true
+      };
+    }
+
+    // Sin solapamiento: comparación agregada (escenarios en zonas distintas).
     return {
-      avgDelta: avg,
-      maxDelta: Math.max(...deltas),
-      minDelta: Math.min(...deltas),
-      aBetterCount: aBetter,
-      bBetterCount: bBetter,
-      similarCount: similar,
-      totalMatched: pts.length
+      avgDelta,
+      maxDelta: avgDelta,
+      minDelta: avgDelta,
+      aBetterCount: 0,
+      bBetterCount: 0,
+      similarCount: 0,
+      totalMatched: 0,
+      hasSpatialOverlap: false
     };
   });
 
