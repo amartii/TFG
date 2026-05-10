@@ -20,3 +20,12 @@ matlab/data/*.zip
 
 # Sprint notes & personal planning
 ToGetDone/
+shared-tasks/
+
+# Angular build cache y artefactos compilados
+.angular/
+mockups/mockup_v1/gemelo-digital-5g/dist/
+
+# Carpeta de outputs antiguos de MATLAB
+matlab/output/aoutputs\ v1/
+"matlab/output/aoutputs v1/"
