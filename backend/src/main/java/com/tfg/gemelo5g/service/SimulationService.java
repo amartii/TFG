@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tfg.gemelo5g.exception.SimulationNotFoundException;
 import com.tfg.gemelo5g.model.SimulationSummaryDto;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -54,12 +56,32 @@ public class SimulationService {
      * @param id UUID de la simulación (sin extensión .json)
      * @throws SimulationNotFoundException si no existe el fichero
      */
+    private static final String UUID_REGEX =
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
     public JsonNode getById(String id) throws IOException {
-        Path file = dataDir.resolve(id + ".json");
-        if (!Files.exists(file)) {
+        if (!id.matches(UUID_REGEX)) {
+            throw new SimulationNotFoundException(id);
+        }
+        Path file = dataDir.resolve(id + ".json").normalize();
+        if (!file.startsWith(dataDir) || !Files.exists(file)) {
             throw new SimulationNotFoundException(id);
         }
         return mapper.readTree(file.toFile());
+    }
+
+    /**
+     * Devuelve el fichero JSON como Resource para descarga directa.
+     */
+    public Resource getFileResource(String id) {
+        if (!id.matches(UUID_REGEX)) {
+            throw new SimulationNotFoundException(id);
+        }
+        Path file = dataDir.resolve(id + ".json").normalize();
+        if (!file.startsWith(dataDir) || !Files.exists(file)) {
+            throw new SimulationNotFoundException(id);
+        }
+        return new FileSystemResource(file);
     }
 
     // -----------------------------------------------------------------------
