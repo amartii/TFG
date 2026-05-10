@@ -1,0 +1,366 @@
+@use '../../../styles/variables' as *;
+
+.comparison-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+.comparison-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-sm $spacing-md;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__close {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: $border-radius-sm;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: $font-size-xs;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+  }
+}
+
+// ── Body: mapas + dashboard ──────────────────────────────────────────────────
+
+.comparison-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+// ── Map panel ────────────────────────────────────────────────────────────────
+
+.map-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+
+  &:last-child {
+    border-right: none;
+    border-left: 1px solid var(--border);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-xs $spacing-sm;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  &__name {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__map {
+    flex: 1;
+    min-height: 200px;
+  }
+
+  &__stats {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+}
+
+.mini-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  background: var(--bg-tertiary);
+
+  &__val {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-bold;
+    color: var(--accent-primary);
+    line-height: 1;
+  }
+
+  &__lbl {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+}
+
+// ── Dashboard central ────────────────────────────────────────────────────────
+
+.dashboard {
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: $spacing-sm;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+
+  &__section {
+    padding: $spacing-sm;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: $border-radius-sm;
+  }
+
+  &__title {
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__empty {
+    font-size: $font-size-xs;
+    color: var(--text-muted);
+    text-align: center;
+    padding: $spacing-md 0;
+  }
+}
+
+// ── Delta display ────────────────────────────────────────────────────────────
+
+.delta-display {
+  text-align: center;
+  padding: $spacing-sm 0;
+
+  &__value {
+    font-family: $font-mono;
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: var(--text-primary);
+  }
+
+  &__unit {
+    display: block;
+    font-size: $font-size-xs;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  &--positive .delta-display__value {
+    color: #f97316;
+  }
+
+  &--negative .delta-display__value {
+    color: #3b82f6;
+  }
+}
+
+.delta-range {
+  display: flex;
+  justify-content: space-around;
+  margin-top: $spacing-sm;
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  &__label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  &__value {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+// ── Advantage bars ───────────────────────────────────────────────────────────
+
+.advantage-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.advantage-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.advantage-label {
+  width: 52px;
+  font-size: 10px;
+  font-weight: $font-weight-medium;
+  flex-shrink: 0;
+}
+
+.advantage-bar-track {
+  flex: 1;
+  height: 12px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.advantage-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width $transition-base;
+  min-width: 4px;
+
+  &--a { background: #f97316; }
+  &--equal { background: #6b7280; }
+  &--b { background: #3b82f6; }
+}
+
+.advantage-count {
+  width: 32px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+// ── Coverage compare ─────────────────────────────────────────────────────────
+
+.coverage-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coverage-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &__swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    width: 52px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  &__bars {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  &__vals {
+    width: 56px;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: right;
+    flex-shrink: 0;
+  }
+}
+
+.coverage-mini-bar {
+  height: 5px;
+  border-radius: 2px;
+  transition: width $transition-base;
+  min-width: 2px;
+
+  &--a { background: #f97316; }
+  &--b { background: #3b82f6; }
+}
+
+// ── Params table ─────────────────────────────────────────────────────────────
+
+.params-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.params-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  padding: 2px 0;
+
+  &--header {
+    font-weight: $font-weight-semibold;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+}
+
+// ── Badges ───────────────────────────────────────────────────────────────────
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: $font-weight-bold;
+  flex-shrink: 0;
+  color: #fff;
+
+  &--a { background: #f97316; }
+  &--b { background: #3b82f6; }
+}
+
+// ── Leaflet marker fix ───────────────────────────────────────────────────────
+
+:global(.tx-marker-cmp) {
+  background: transparent !important;
+  border: none !important;
+}

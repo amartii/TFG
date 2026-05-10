@@ -10,11 +10,7 @@ import { SimulationService } from '../../services/simulation.service';
     @if (stats()) {
       <section class="stats">
         <div class="section-header">
-          <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
+          <span class="section-dot"></span>
           <h3 class="section-title">Estadísticas</h3>
         </div>
 
@@ -57,10 +53,10 @@ import { SimulationService } from '../../services/simulation.service';
             </div>
           </div>
           <div class="distribution__legend">
-            <span class="legend-item"><span class="dot dot--excellent"></span> Excelente</span>
-            <span class="legend-item"><span class="dot dot--good"></span> Buena</span>
-            <span class="legend-item"><span class="dot dot--acceptable"></span> Aceptable</span>
-            <span class="legend-item"><span class="dot dot--weak"></span> Débil</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--excellent"></span> Excelente</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--good"></span> Buena</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--acceptable"></span> Aceptable</span>
+            <span class="legend-item"><span class="legend-swatch legend-swatch--weak"></span> Débil</span>
           </div>
         </div>
       </section>
@@ -81,16 +77,18 @@ import { SimulationService } from '../../services/simulation.service';
       gap: $spacing-sm;
     }
 
-    .section-icon {
-      width: 18px;
-      height: 18px;
-      color: $color-accent-primary;
+    .section-dot {
+      width: 4px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--accent-primary);
+      flex-shrink: 0;
     }
 
     .section-title {
       font-size: $font-size-sm;
       font-weight: $font-weight-semibold;
-      color: $color-text-primary;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -106,21 +104,21 @@ import { SimulationService } from '../../services/simulation.service';
       flex-direction: column;
       align-items: center;
       padding: $spacing-md;
-      background: $color-bg-tertiary;
+      background: var(--bg-tertiary);
       border-radius: $border-radius-md;
-      border: 1px solid $color-border;
+      border: 1px solid var(--border);
       text-align: center;
 
       &__value {
         font-size: $font-size-lg;
         font-weight: $font-weight-bold;
-        color: $color-accent-primary;
+        color: var(--accent-primary);
         line-height: 1;
       }
 
       &__label {
         font-size: $font-size-xs;
-        color: $color-text-muted;
+        color: var(--text-muted);
         margin-top: $spacing-xs;
       }
     }
@@ -130,12 +128,12 @@ import { SimulationService } from '../../services/simulation.service';
       flex-direction: column;
       gap: $spacing-sm;
       padding: $spacing-md;
-      background: $color-bg-tertiary;
+      background: var(--bg-tertiary);
       border-radius: $border-radius-md;
 
       &__header {
         font-size: $font-size-xs;
-        color: $color-text-secondary;
+        color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
@@ -145,7 +143,7 @@ import { SimulationService } from '../../services/simulation.service';
         height: 24px;
         border-radius: $border-radius-sm;
         overflow: hidden;
-        background: $color-bg-secondary;
+        background: var(--bg-secondary);
       }
 
       &__legend {
@@ -153,7 +151,7 @@ import { SimulationService } from '../../services/simulation.service';
         flex-wrap: wrap;
         gap: $spacing-sm;
         font-size: $font-size-xs;
-        color: $color-text-muted;
+        color: var(--text-muted);
       }
     }
 
@@ -183,10 +181,10 @@ import { SimulationService } from '../../services/simulation.service';
       gap: 4px;
     }
 
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+    .legend-swatch {
+      width: 10px;
+      height: 6px;
+      border-radius: 1px;
 
       &--excellent { background: $color-rsrp-excellent; }
       &--good { background: $color-rsrp-good; }

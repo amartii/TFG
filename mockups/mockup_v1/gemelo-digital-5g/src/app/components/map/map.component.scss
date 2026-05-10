@@ -29,6 +29,11 @@
     bottom: $spacing-xl;
     left: $spacing-md;
   }
+
+  &--bottom-right {
+    bottom: $spacing-xl;
+    right: $spacing-md;
+  }
 }
 
 .map-info {
@@ -37,20 +42,20 @@
   gap: $spacing-xs;
   padding: $spacing-sm $spacing-md;
   background: rgba($color-bg-card, 0.95);
-  border: 1px solid $color-border;
+  border: 1px solid var(--border);
   border-radius: $border-radius-md;
   backdrop-filter: blur(8px);
 
   &__label {
     font-size: $font-size-xs;
-    color: $color-text-muted;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   &__value {
     font-size: $font-size-sm;
-    color: $color-accent-primary;
+    color: var(--accent-primary);
     font-weight: $font-weight-medium;
   }
 }
@@ -65,28 +70,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   background: rgba($color-bg-card, 0.95);
-  border: 1px solid $color-border;
-  border-radius: $border-radius-md;
+  border: 1px solid var(--border);
+  border-radius: $border-radius-sm;
   cursor: pointer;
   transition: all $transition-fast;
   backdrop-filter: blur(8px);
 
   svg {
-    width: 20px;
-    height: 20px;
-    color: $color-text-secondary;
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
     transition: color $transition-fast;
   }
 
   &:hover {
-    background: $color-bg-hover;
-    border-color: $color-accent-primary;
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
 
     svg {
-      color: $color-accent-primary;
+      color: var(--accent-primary);
     }
   }
 }
@@ -100,9 +105,8 @@
 :global(.tx-marker__inner) {
   width: 48px;
   height: 48px;
-  color: $color-accent-primary;
-  filter: drop-shadow(0 0 10px rgba($color-accent-primary, 0.5));
-  animation: pulse 2s ease-in-out infinite;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 6px rgba($color-accent-primary, 0.4));
 
   svg {
     width: 100%;
@@ -112,21 +116,55 @@
 
 // Popup de Leaflet personalizado
 :global(.leaflet-popup-content-wrapper) {
-  background: $color-bg-card !important;
-  border: 1px solid $color-border !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
   border-radius: $border-radius-md !important;
-  color: $color-text-primary !important;
+  color: var(--text-primary) !important;
 }
 
 :global(.leaflet-popup-tip) {
-  background: $color-bg-card !important;
-  border: 1px solid $color-border !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
 }
 
 :global(.leaflet-popup-close-button) {
-  color: $color-text-muted !important;
+  color: var(--text-muted) !important;
 
   &:hover {
-    color: $color-accent-primary !important;
+    color: var(--accent-primary) !important;
+  }
+}
+
+// ── Leyenda de diferencia ────────────────────────────────────────────────────
+
+.diff-legend {
+  padding: $spacing-sm $spacing-md;
+  background: rgba($color-bg-card, 0.95);
+  border: 1px solid var(--border);
+  border-radius: $border-radius-md;
+  backdrop-filter: blur(8px);
+  min-width: 140px;
+
+  &__title {
+    display: block;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: var(--text-primary);
+    text-align: center;
+    margin-bottom: 6px;
+  }
+
+  &__bar {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #3b82f6, #6b7280 50%, #f97316);
+  }
+
+  &__labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
   }
 }

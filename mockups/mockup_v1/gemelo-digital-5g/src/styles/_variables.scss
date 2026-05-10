@@ -105,3 +105,9 @@ $z-sticky: 200;
 $z-fixed: 300;
 $z-modal: 400;
 $z-tooltip: 500;
+
+// ===========================================
+// TEMA CLARO (override via CSS custom properties)
+// ===========================================
+// El tema oscuro es el default. El tema claro se activa
+// con la clase .theme-light en <body> usando CSS custom props.

@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SimulationService } from '../../services/simulation.service';
+import { ComparisonService } from '../../services/comparison.service';
 import { CoverageLegendComponent } from '../coverage-legend/coverage-legend.component';
 import { StatsPanelComponent } from '../stats-panel/stats-panel.component';
 import { SimulationConfigComponent } from '../simulation-config/simulation-config.component';
@@ -16,13 +17,16 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
         <!-- Selector de Simulación -->
         <section class="sidebar__section">
           <div class="section-header">
-            <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
+            <span class="section-dot"></span>
             <h3 class="section-title">Simulación Activa</h3>
           </div>
+
+          @if (simulationService.loading()) {
+            <div class="loading-indicator">
+              <span class="spinner"></span>
+              <span>Cargando simulación...</span>
+            </div>
+          }
 
           <select
             class="form-control"
@@ -36,15 +40,69 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
           </select>
         </section>
 
+        <!-- Comparación de simulaciones -->
+        <section class="sidebar__section">
+          <div class="section-header">
+            <span class="section-dot"></span>
+            <h3 class="section-title">Comparación</h3>
+          </div>
+
+          @if (!comparisonService.active()) {
+            <button
+              class="btn btn--compare"
+              [disabled]="comparisonService.comparableSimulations().length === 0"
+              (click)="comparisonService.startComparison()">
+              Comparar simulaciones
+            </button>
+          } @else {
+            <div class="comparison-controls">
+              <label class="comparison-label">
+                <span class="comparison-badge comparison-badge--a">A</span>
+                {{ simulationService.currentSimulation()?.metadata?.scenario_name || 'Principal' }}
+              </label>
+
+              <label class="comparison-label">
+                <span class="comparison-badge comparison-badge--b">B</span>
+                <select
+                  class="form-control form-control--sm"
+                  [value]="comparisonService.simulationBId() || ''"
+                  (change)="onComparisonBChange($event)">
+                  <option value="" disabled>Seleccionar...</option>
+                  @for (sim of comparisonService.comparableSimulations(); track sim.simulation_id) {
+                    <option [value]="sim.simulation_id">
+                      {{ sim.metadata.scenario_name || sim.simulation_id }}
+                    </option>
+                  }
+                </select>
+              </label>
+
+              @if (comparisonService.loadingB()) {
+                <div class="loading-indicator">
+                  <span class="spinner"></span>
+                  <span>Cargando B...</span>
+                </div>
+              }
+
+              @if (comparisonService.simulationB()) {
+                <div class="comparison-hint">
+                  Vista dividida activa — dashboard en panel central
+                </div>
+              }
+
+              <button class="btn btn--exit-compare" (click)="comparisonService.stopComparison()">
+                Salir de comparación
+              </button>
+            </div>
+          }
+        </section>
+
         <!-- Configuración de la Simulación -->
         <app-simulation-config />
 
         <!-- Filtro RSRP -->
         <section class="sidebar__section">
           <div class="section-header">
-            <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-            </svg>
+            <span class="section-dot"></span>
             <h3 class="section-title">Filtro de Cobertura</h3>
           </div>
 
@@ -85,10 +143,6 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
 
       <div class="sidebar__footer">
         <div class="footer-info">
-          <svg class="footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
           <span>Última actualización: {{ lastUpdate }}</span>
         </div>
         <div class="footer-credits">
@@ -102,11 +156,19 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
 })
 export class SidebarComponent {
   simulationService = inject(SimulationService);
+  comparisonService = inject(ComparisonService);
   lastUpdate = new Date().toLocaleTimeString('es-ES');
 
-  onSimulationChange(event: Event): void {
+  async onSimulationChange(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
-    this.simulationService.selectSimulation(select.value);
+    await this.simulationService.selectSimulation(select.value);
+  }
+
+  async onComparisonBChange(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement;
+    if (select.value) {
+      await this.comparisonService.selectSimulationB(select.value);
+    }
   }
 
   onThresholdChange(event: Event): void {

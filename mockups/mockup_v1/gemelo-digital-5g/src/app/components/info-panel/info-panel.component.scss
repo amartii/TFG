@@ -4,21 +4,22 @@
   position: absolute;
   bottom: $spacing-lg;
   right: $spacing-lg;
+  z-index: 1000;
   width: $info-panel-width;
-  background: $color-bg-card;
-  border: 1px solid $color-border;
-  border-radius: $border-radius-lg;
-  box-shadow: $shadow-lg;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: $border-radius-md;
+  box-shadow: var(--shadow-base);
   overflow: hidden;
-  animation: slideIn 0.3s ease-out;
+  animation: slideIn 0.2s ease-out;
 
   &__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: $spacing-md $spacing-lg;
-    background: $color-bg-tertiary;
-    border-bottom: 1px solid $color-border;
+    padding: $spacing-sm $spacing-md;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
   }
 
   &__title {
@@ -27,21 +28,21 @@
     gap: $spacing-sm;
     font-size: $font-size-sm;
     font-weight: $font-weight-semibold;
-    color: $color-text-primary;
+    color: var(--text-primary);
   }
 
   &__icon {
-    width: 18px;
-    height: 18px;
-    color: $color-accent-primary;
+    width: 16px;
+    height: 16px;
+    color: var(--accent-primary);
   }
 
   &__close {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     background: transparent;
     border: none;
     border-radius: $border-radius-sm;
@@ -49,101 +50,89 @@
     transition: all $transition-fast;
 
     svg {
-      width: 16px;
-      height: 16px;
-      color: $color-text-muted;
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
     }
 
     &:hover {
       background: rgba($color-accent-danger, 0.1);
-
-      svg {
-        color: $color-accent-danger;
-      }
+      svg { color: $color-accent-danger; }
     }
   }
 
   &__content {
-    padding: $spacing-lg;
+    padding: $spacing-md;
     display: flex;
     flex-direction: column;
-    gap: $spacing-md;
+    gap: $spacing-sm;
   }
 }
 
 .signal-indicator {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: $spacing-lg;
-  border-radius: $border-radius-md;
-  text-align: center;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  border-radius: $border-radius-sm;
 
   &--excelente {
-    background: rgba($color-rsrp-excellent, 0.1);
-    border: 1px solid rgba($color-rsrp-excellent, 0.3);
-
+    background: rgba($color-rsrp-excellent, 0.08);
+    border-left: 3px solid $color-rsrp-excellent;
     .signal-indicator__value { color: $color-rsrp-excellent; }
     .bar.active { background: $color-rsrp-excellent; }
   }
 
   &--buena {
-    background: rgba($color-rsrp-good, 0.1);
-    border: 1px solid rgba($color-rsrp-good, 0.3);
-
+    background: rgba($color-rsrp-good, 0.08);
+    border-left: 3px solid $color-rsrp-good;
     .signal-indicator__value { color: $color-rsrp-good; }
     .bar.active { background: $color-rsrp-good; }
   }
 
   &--aceptable {
-    background: rgba($color-rsrp-acceptable, 0.1);
-    border: 1px solid rgba($color-rsrp-acceptable, 0.3);
-
+    background: rgba($color-rsrp-acceptable, 0.08);
+    border-left: 3px solid $color-rsrp-acceptable;
     .signal-indicator__value { color: $color-rsrp-acceptable; }
     .bar.active { background: $color-rsrp-acceptable; }
   }
 
   &--débil {
-    background: rgba($color-rsrp-weak, 0.1);
-    border: 1px solid rgba($color-rsrp-weak, 0.3);
-
+    background: rgba($color-rsrp-weak, 0.08);
+    border-left: 3px solid $color-rsrp-weak;
     .signal-indicator__value { color: $color-rsrp-weak; }
     .bar.active { background: $color-rsrp-weak; }
   }
 
   &__value {
-    font-size: $font-size-2xl;
+    font-size: $font-size-xl;
     font-weight: $font-weight-bold;
+    font-family: $font-mono;
     line-height: 1;
   }
 
   &__label {
-    font-size: $font-size-sm;
-    color: $color-text-secondary;
-    margin-top: $spacing-xs;
+    font-size: $font-size-xs;
+    color: var(--text-secondary);
   }
 
   &__bars {
     display: flex;
     align-items: flex-end;
-    gap: 4px;
-    margin-top: $spacing-md;
-    height: 24px;
+    gap: 3px;
+    margin-left: auto;
+    height: 20px;
 
     .bar {
-      width: 8px;
-      background: $color-border;
-      border-radius: 2px;
+      width: 6px;
+      background: var(--border);
+      border-radius: 1px;
       transition: all $transition-fast;
 
-      &:nth-child(1) { height: 6px; }
-      &:nth-child(2) { height: 12px; }
-      &:nth-child(3) { height: 18px; }
-      &:nth-child(4) { height: 24px; }
-
-      &.active {
-        box-shadow: 0 0 6px currentColor;
-      }
+      &:nth-child(1) { height: 5px; }
+      &:nth-child(2) { height: 10px; }
+      &:nth-child(3) { height: 15px; }
+      &:nth-child(4) { height: 20px; }
     }
   }
 }
@@ -152,37 +141,35 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: $spacing-sm 0;
-  border-bottom: 1px solid rgba($color-border, 0.5);
+  padding: $spacing-xs 0;
+  border-bottom: 1px solid var(--border);
+
+  &.no-border { border-bottom: none; }
 
   &__label {
-    font-size: $font-size-sm;
-    color: $color-text-secondary;
+    font-size: $font-size-xs;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
   &__value {
     font-size: $font-size-sm;
-    color: $color-text-primary;
+    color: var(--text-primary);
     font-weight: $font-weight-medium;
   }
 }
 
 .info-description {
-  display: flex;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  background: $color-bg-tertiary;
-  border-radius: $border-radius-md;
+  padding: $spacing-xs $spacing-sm;
+  background: var(--bg-tertiary);
+  border-radius: $border-radius-sm;
   font-size: $font-size-xs;
-  color: $color-text-secondary;
-  line-height: 1.5;
+  color: var(--text-secondary);
+  line-height: 1.4;
 
   &__icon {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    color: $color-accent-secondary;
-    margin-top: 2px;
+    display: none;
   }
 
   p {
@@ -193,7 +180,7 @@
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;

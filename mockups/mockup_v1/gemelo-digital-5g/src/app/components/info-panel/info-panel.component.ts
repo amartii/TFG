@@ -8,7 +8,7 @@ import { SimulationService } from '../../services/simulation.service';
   imports: [CommonModule],
   template: `
     @if (selectedPoint()) {
-      <div class="info-panel" [@slideIn]>
+      <div class="info-panel">
         <div class="info-panel__header">
           <h4 class="info-panel__title">
             <svg class="info-panel__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -49,14 +49,14 @@ import { SimulationService } from '../../services/simulation.service';
             <span class="info-row__value font-mono">{{ selectedPoint()!.longitude.toFixed(6) }}°</span>
           </div>
 
-          <!-- Interpretación -->
-          <div class="info-description">
-            <svg class="info-description__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            <p>{{ rsrpLevel().description }}</p>
+          <!-- Métricas adicionales -->
+          <div class="info-row">
+            <span class="info-row__label">Umbral 3GPP</span>
+            <span class="info-row__value font-mono">{{ rsrpLevel().min }} / {{ rsrpLevel().max }} dBm</span>
+          </div>
+          <div class="info-row no-border">
+            <span class="info-row__label">Path loss est.</span>
+            <span class="info-row__value font-mono">{{ pathLoss() }} dB</span>
           </div>
         </div>
       </div>
@@ -71,8 +71,20 @@ export class InfoPanelComponent {
 
   rsrpLevel = computed(() => {
     const point = this.selectedPoint();
-    if (!point) return { label: 'Unknown', description: '', color: '#888', min: -140, max: -40 };
+    if (!point) return { label: '—', description: '', color: '#888', min: -140, max: -40 };
     return this.simulationService.getRsrpLevel(point.rsrp_dbm);
+  });
+
+  // EIRP estimado de la simulación activa (Ptx + Gtx - cable ≈ parámetros del JSON)
+  pathLoss = computed(() => {
+    const point = this.selectedPoint();
+    const meta  = this.simulationService.currentSimulation()?.metadata;
+    if (!point || !meta) return '—';
+    // EIRP ≈ Ptx + 15 dBi antena - 2 dB cable = Ptx + 13 (approx genérico)
+    const eirp_approx = (meta.tx_power_dbm ?? 40) + 13;
+    // Path loss = EIRP - RSRP (ignorando ganancia Rx ~0 dBi)
+    const pl = eirp_approx - point.rsrp_dbm;
+    return `${pl.toFixed(1)}`;
   });
 
   closePanel(): void {
@@ -80,10 +92,8 @@ export class InfoPanelComponent {
   }
 
   getBarActive(bar: number): boolean {
-    const point = this.selectedPoint();
-    if (!point) return false;
-
-    const rsrp = point.rsrp_dbm;
+    const rsrp = this.selectedPoint()?.rsrp_dbm;
+    if (rsrp == null) return false;
     if (bar === 1) return rsrp >= -140;
     if (bar === 2) return rsrp >= -100;
     if (bar === 3) return rsrp >= -85;

@@ -1,6 +1,39 @@
 @use 'variables' as *;
 
 // ===========================================
+// CSS CUSTOM PROPERTIES (tema dinámico)
+// ===========================================
+:root {
+  --bg-primary: #{$color-bg-primary};
+  --bg-secondary: #{$color-bg-secondary};
+  --bg-tertiary: #{$color-bg-tertiary};
+  --bg-card: #{$color-bg-card};
+  --bg-hover: #{$color-bg-hover};
+  --border: #{$color-border};
+  --border-light: #{$color-border-light};
+  --text-primary: #{$color-text-primary};
+  --text-secondary: #{$color-text-secondary};
+  --text-muted: #{$color-text-muted};
+  --accent-primary: #{$color-accent-primary};
+  --shadow-base: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-light {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8eaee;
+  --bg-card: #ffffff;
+  --bg-hover: #dfe2e8;
+  --border: #c8ccd4;
+  --border-light: #adb2bc;
+  --text-primary: #1a1f2e;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  --accent-primary: #0d9488;
+  --shadow-base: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+// ===========================================
 // RESET Y ESTILOS BASE
 // ===========================================
 *, *::before, *::after {
@@ -19,8 +52,8 @@ body {
   font-size: $font-size-base;
   font-weight: $font-weight-normal;
   line-height: 1.5;
-  color: $color-text-primary;
-  background-color: $color-bg-primary;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -29,97 +62,70 @@ body {
 // ===========================================
 // UTILIDADES
 // ===========================================
-.text-accent {
-  color: $color-accent-primary;
-}
+.text-accent    { color: var(--accent-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
 
-.text-secondary {
-  color: $color-text-secondary;
-}
-
-.text-muted {
-  color: $color-text-muted;
-}
-
-.font-mono {
-  font-family: $font-mono;
-}
-
-.font-semibold {
-  font-weight: $font-weight-semibold;
-}
+.font-mono      { font-family: $font-mono; }
+.font-semibold  { font-weight: $font-weight-semibold; }
 
 // Badges de nivel RSRP
 .rsrp-badge {
   display: inline-flex;
   align-items: center;
   padding: $spacing-xs $spacing-sm;
-  border-radius: $border-radius-full;
+  border-radius: $border-radius-sm;
   font-size: $font-size-xs;
   font-weight: $font-weight-medium;
 
   &--excellent {
-    background: rgba($color-rsrp-excellent, 0.15);
+    background: rgba($color-rsrp-excellent, 0.12);
     color: $color-rsrp-excellent;
-    border: 1px solid rgba($color-rsrp-excellent, 0.3);
+    border: 1px solid rgba($color-rsrp-excellent, 0.25);
   }
-
   &--good {
-    background: rgba($color-rsrp-good, 0.15);
+    background: rgba($color-rsrp-good, 0.12);
     color: $color-rsrp-good;
-    border: 1px solid rgba($color-rsrp-good, 0.3);
+    border: 1px solid rgba($color-rsrp-good, 0.25);
   }
-
   &--acceptable {
-    background: rgba($color-rsrp-acceptable, 0.15);
+    background: rgba($color-rsrp-acceptable, 0.12);
     color: $color-rsrp-acceptable;
-    border: 1px solid rgba($color-rsrp-acceptable, 0.3);
+    border: 1px solid rgba($color-rsrp-acceptable, 0.25);
   }
-
   &--weak {
-    background: rgba($color-rsrp-weak, 0.15);
+    background: rgba($color-rsrp-weak, 0.12);
     color: $color-rsrp-weak;
-    border: 1px solid rgba($color-rsrp-weak, 0.3);
+    border: 1px solid rgba($color-rsrp-weak, 0.25);
   }
 }
 
-// Scrollbar personalizada
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: $color-bg-secondary;
-}
-
+// Scrollbar
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
 ::-webkit-scrollbar-thumb {
-  background: $color-border;
-  border-radius: $border-radius-full;
-
-  &:hover {
-    background: $color-border-light;
-  }
+  background: var(--border);
+  border-radius: 3px;
+  &:hover { background: var(--border-light); }
 }
 
-// Selección de texto
 ::selection {
-  background: rgba($color-accent-primary, 0.3);
-  color: $color-text-primary;
+  background: rgba($color-accent-primary, 0.25);
+  color: var(--text-primary);
 }
 
 // ===========================================
 // COMPONENTES BASE
 // ===========================================
 .card {
-  background: $color-bg-card;
-  border: 1px solid $color-border;
-  border-radius: $border-radius-lg;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: $border-radius-md;
   padding: $spacing-lg;
 
   &--hover:hover {
-    border-color: $color-border-light;
-    background: $color-bg-hover;
+    border-color: var(--border-light);
+    background: var(--bg-hover);
   }
 }
 
@@ -130,7 +136,7 @@ body {
   gap: $spacing-sm;
   padding: $spacing-sm $spacing-md;
   border: none;
-  border-radius: $border-radius-md;
+  border-radius: $border-radius-sm;
   font-family: $font-primary;
   font-size: $font-size-sm;
   font-weight: $font-weight-medium;
@@ -138,67 +144,59 @@ body {
   transition: all $transition-fast;
 
   &--primary {
-    background: $gradient-primary;
-    color: $color-bg-primary;
-
-    &:hover {
-      box-shadow: $shadow-glow;
-      transform: translateY(-1px);
-    }
+    background: var(--accent-primary);
+    color: #fff;
+    &:hover { filter: brightness(1.1); }
   }
 
   &--secondary {
-    background: $color-bg-tertiary;
-    color: $color-text-primary;
-    border: 1px solid $color-border;
-
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
     &:hover {
-      background: $color-bg-hover;
-      border-color: $color-border-light;
+      background: var(--bg-hover);
+      border-color: var(--border-light);
     }
   }
 
   &--icon {
     padding: $spacing-sm;
     background: transparent;
-    color: $color-text-secondary;
-
+    color: var(--text-secondary);
+    border: none;
     &:hover {
-      color: $color-accent-primary;
-      background: rgba($color-accent-primary, 0.1);
+      color: var(--accent-primary);
+      background: rgba($color-accent-primary, 0.08);
     }
   }
 }
 
-// Input/Select styles
+// Input/Select
 .form-control {
   width: 100%;
   padding: $spacing-sm $spacing-md;
-  background: $color-bg-secondary;
-  border: 1px solid $color-border;
-  border-radius: $border-radius-md;
-  color: $color-text-primary;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: $border-radius-sm;
+  color: var(--text-primary);
   font-family: $font-primary;
   font-size: $font-size-sm;
   transition: border-color $transition-fast;
 
   &:focus {
     outline: none;
-    border-color: $color-accent-primary;
-    box-shadow: 0 0 0 3px rgba($color-accent-primary, 0.1);
+    border-color: var(--accent-primary);
   }
 
-  &::placeholder {
-    color: $color-text-muted;
-  }
+  &::placeholder { color: var(--text-muted); }
 }
 
 select.form-control {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
+  background-position: right 10px center;
+  padding-right: 30px;
   cursor: pointer;
 }
 
@@ -207,32 +205,27 @@ select.form-control {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
-  background: $color-bg-secondary;
+  height: 4px;
+  background: var(--border);
   border-radius: $border-radius-full;
   outline: none;
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 18px;
-    height: 18px;
-    background: $color-accent-primary;
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
     border-radius: 50%;
     cursor: pointer;
-    transition: all $transition-fast;
-    box-shadow: 0 0 10px rgba($color-accent-primary, 0.5);
-
-    &:hover {
-      transform: scale(1.1);
-      box-shadow: 0 0 15px rgba($color-accent-primary, 0.7);
-    }
+    transition: transform $transition-fast;
+    &:hover { transform: scale(1.15); }
   }
 
   &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: $color-accent-primary;
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
     border-radius: 50%;
     cursor: pointer;
     border: none;
@@ -241,51 +234,34 @@ select.form-control {
 
 // Leaflet overrides
 .leaflet-container {
-  background: $color-bg-primary !important;
+  background: var(--bg-primary) !important;
   font-family: $font-primary !important;
 }
 
 .leaflet-control-zoom {
   border: none !important;
-  box-shadow: $shadow-md !important;
+  box-shadow: none !important;
+  border: 1px solid var(--border) !important;
 
   a {
-    background: $color-bg-card !important;
-    color: $color-text-primary !important;
-    border: 1px solid $color-border !important;
-
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border) !important;
     &:hover {
-      background: $color-bg-hover !important;
-      color: $color-accent-primary !important;
+      background: var(--bg-hover) !important;
+      color: var(--accent-primary) !important;
     }
   }
 }
 
 .leaflet-control-attribution {
-  background: rgba($color-bg-card, 0.9) !important;
-  color: $color-text-muted !important;
+  background: rgba($color-bg-card, 0.85) !important;
+  color: var(--text-muted) !important;
   font-size: $font-size-xs !important;
-
-  a {
-    color: $color-accent-primary !important;
-  }
+  a { color: var(--accent-primary) !important; }
 }
 
 // Animaciones
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes glow {
-  0%, 100% { box-shadow: 0 0 5px $color-accent-primary; }
-  50% { box-shadow: 0 0 20px $color-accent-primary; }
-}
-
-.animate-pulse {
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.animate-glow {
-  animation: glow 2s ease-in-out infinite;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
