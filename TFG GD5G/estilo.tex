@@ -2,13 +2,18 @@
 
 \usepackage[spanish,es-tabla]{babel}
 \usepackage[utf8]{inputenc}
+\usepackage{amsmath}
 \usepackage{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{ltablex}  % tabularx + longtable
 \usepackage{makeidx}
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{color}
 \usepackage{caption}
-\usepackage{acronym}
+\usepackage[printonlyused,withpage]{acronym}
 \usepackage{hyphenat}
 \usepackage{a4wide}
 \usepackage[normalsize]{subfigure}
@@ -85,6 +90,22 @@
     type, namespace, module, declare, readonly, as, is},
   morekeywords=[2]{string, number, boolean, any, void, never, object, symbol,
     undefined, null, unknown, bigint, Array, Promise, Observable},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]`
+}
+
+% Definición de lenguaje JavaScript (similar a TypeScript pero sin tipos)
+\lstdefinelanguage{JavaScript}{
+  keywords={break, case, catch, continue, debugger, default, delete, do,
+    else, finally, for, function, if, in, instanceof, new, return, switch,
+    this, throw, try, typeof, var, void, while, with, let, const, class,
+    export, extends, import, super, async, await, from, of},
+  morekeywords=[2]{undefined, null, NaN, Infinity, true, false, Array, Object,
+    String, Number, Boolean, Promise, Set, Map},
   sensitive=true,
   morecomment=[l]{//},
   morecomment=[s]{/*}{*/},
