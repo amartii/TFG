@@ -111,6 +111,8 @@ function fichero_json = exportar_json(nombre, lats, lons, rsrp_dBm, params)
     metadata.model           = char(string(params.modelo_propagacion));
     metadata.terrain_data    = char(string(params.datos_elevacion));
     metadata.scenario_name   = char(string(nombre));
+    metadata.model_version   = '1.0.0';
+    metadata.matlab_version  = version;
 
     % Array de coveragePoints — filtrar puntos con RSRP por debajo de umbral
     % (opcional: se pueden incluir todos y dejar el filtrado al frontend)

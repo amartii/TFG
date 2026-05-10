@@ -15,7 +15,7 @@
 %   y exporta los resultados en formato JSON para el backend Spring Boot.
 %
 % REQUISITOS MATLAB:
-%   - MATLAB R2024a o superior
+%   - MATLAB R2025b o superior (probado en R2025b Update 4)
 %   - Communications Toolbox (para propagationModel y txsite/rxsite)
 %   - Mapping Toolbox (para readgeoraster, geotiffread, mapinterp)
 %   - Antenna Toolbox (para modelos de antena configurables)
@@ -111,6 +111,13 @@ if isfile(srtm_file)
     % geointerp interpola usando la referencia geográfica R del raster
     elev_grid = geointerp(elev_data, R, lats_flat, lons_flat, 'linear');
     fprintf('Elevación cargada. Rango: [%.0f, %.0f] m\n', min(elev_grid), max(elev_grid));
+
+    % Validar que el TX cae dentro del tile SRTM (M7)
+    lat_lims = R.LatitudeLimits;
+    lon_lims = R.LongitudeLimits;
+    if lat0 < lat_lims(1) || lat0 > lat_lims(2) || lon0 < lon_lims(1) || lon0 > lon_lims(2)
+        warning('TFG:srtm', 'TX fuera del tile SRTM. Usando elevación 0 m para TX.');
+    end
 else
     % --- OPCIÓN B: Terreno plano (para pruebas iniciales sin SRTM) ---
     warning('Fichero SRTM no encontrado. Usando terreno plano (elev=0).');
@@ -130,7 +137,10 @@ tiene_srtm = isfile(srtm_file);
 %  =========================================================================
 % Selección automática del modelo según toolboxes disponibles:
 %   1) Longley-Rice ITM  — si Communications Toolbox está instalado (R2019b+)
-%   2) COST-231 Hata     — fallback empírico si no hay Communications Toolbox
+%      → si hay fichero SRTM local, se carga en el siteviewer (30 m vs 90 m)
+%   2) COST-231 Hata+SRTM — fallback sin Communications Toolbox
+%      → corrección de altura efectiva por terreno usando elev_grid
+%      → sin SRTM: altura fija (terreno plano, como antes)
 %
 % FSPL se calcula siempre como cota superior teórica para validación.
 %
@@ -139,19 +149,48 @@ tiene_srtm = isfile(srtm_file);
 %   COST-231 Hata: COST Action 231, Final Report, European Commission, 1999.
 
 % --- Auto-detección de Communications Toolbox ---
-% ver('comm') es el método fiable; license('test',...) no funciona porque
-% el identificador de licencia no coincide con el nombre del toolbox.
 v_comm = ver('comm');
 tiene_comm_toolbox = ~isempty(v_comm);
 
 if tiene_comm_toolbox
     % -----------------------------------------------------------------------
-    % OPCIÓN A: Longley-Rice ITM via Communications Toolbox (preferido)
-    % propagationModel('longley-rice') disponible desde R2019b.
-    % Usa terreno de la base de datos interna de MATLAB (SRTM 90m global).
-    % Si se carga un siteviewer con el .tif local se obtiene mejor resolución.
+    % OPCIÓN A: Longley-Rice ITM via Communications Toolbox (R2019b+)
+    %
+    % Por defecto, sigstrength usa el terreno global SRTM 90m del toolbox.
+    % Si tenemos el tile local de 30m, lo cargamos en el siteviewer activo
+    % antes de llamar a sigstrength; el modelo lo usa automáticamente.
+    %
+    % API de terreno personalizado (varía según versión de MATLAB):
+    %   R2023a+: rfprop.TerrainModel('File', srtm_file)
+    %   R2021b:  siteviewer('Terrain', srtm_file)  [experimental]
+    %   Resto:   siteviewer sin parámetros (terreno global 90m)
     % -----------------------------------------------------------------------
     fprintf('Communications Toolbox detectado → Longley-Rice ITM\n');
+
+    terrain_desc = 'SRTM_90m_global';   % valor por defecto
+    if tiene_srtm
+        try
+            % Intento 1: API formal R2023a+
+            tm = rfprop.TerrainModel('File', srtm_file);
+            sv = siteviewer('Terrain', tm);                         %#ok<NASGU>
+            terrain_desc = 'SRTM_30m_local';
+            fprintf('Terreno local 30m cargado (rfprop.TerrainModel)\n');
+        catch
+            try
+                % Intento 2: API alternativa R2021b-R2022b
+                sv = siteviewer('Terrain', srtm_file);              %#ok<NASGU>
+                terrain_desc = 'SRTM_30m_local';
+                fprintf('Terreno local 30m cargado (siteviewer directo)\n');
+            catch ME2
+                sv = siteviewer;                                     %#ok<NASGU>
+                fprintf(['Terreno local no disponible (%s)\n' ...
+                    'Usando SRTM 90m global.\n'], ME2.message);
+            end
+        end
+    else
+        sv = siteviewer;                                             %#ok<NASGU>
+        fprintf('Sin fichero SRTM local → terreno global 90m.\n');
+    end
 
     tx = txsite('Name', 'gNodeB_URJC', ...
         'Latitude',             lat0, ...
@@ -160,41 +199,67 @@ if tiene_comm_toolbox
         'TransmitterFrequency', fc_Hz, ...
         'TransmitterPower',     Ptx_W);
 
-    % Usar defaults del modelo (fiabilidad temporal y de emplazamiento = 50 %).
-    % Los parámetros TimeVariabilityTolerance / LocationVariabilityTolerance
-    % fueron eliminados en R2023b+; los defaults son equivalentes a 0.5.
     pm = propagationModel('longley-rice');
 
     rx_sites = rxsite('Latitude',      lats_flat, ...
                       'Longitude',     lons_flat, ...
                       'AntennaHeight', hRx_m);
 
-    fprintf('Calculando Longley-Rice para %d puntos (puede tardar ~60 s)...\n', ...
-        length(lats_flat));
+    fprintf('Calculando Longley-Rice para %d puntos (~60 s)...\n', length(lats_flat));
     Prx_dBm    = sigstrength(rx_sites, tx, pm);
-    Prx_dBm    = Prx_dBm(:);   % garantizar vector columna
+    Prx_dBm    = Prx_dBm(:);
     modelo_usado = 'Longley-Rice';
 
 else
     % -----------------------------------------------------------------------
-    % OPCIÓN B: COST-231 Hata extendido (fallback sin Communications Toolbox)
-    % Válido: 1500–2000 MHz (estrictamente); a 3.5 GHz introduce ~2-4 dB extra.
-    % Escenario: urbano-suburbano macro-célula (C_m = 3 dB).
+    % OPCIÓN B: COST-231 Hata extendido + corrección de terreno SRTM
+    %
+    % COST-231 es empírico (válido 1500–2000 MHz; a 3.5 GHz ≈2-4 dB error).
+    % Para incorporar el efecto del relieve sin Communications Toolbox, usamos
+    % la corrección de "altura efectiva de antena" de Okumura-Hata:
+    %
+    %   hTx_eff(i) = hTx_m + elev_tx - elev_rx(i)
+    %
+    % La antena "gana" cobertura cuando el TX está en un punto más alto que
+    % el receptor y "pierde" en el caso contrario. El mínimo de 5 m evita
+    % que COST-231 produzca resultados fuera de rango para alturas negativas.
     % -----------------------------------------------------------------------
-    fprintf('Communications Toolbox NO disponible → COST-231 Hata (fallback)\n');
+    fprintf('Communications Toolbox NO disponible → COST-231 Hata\n');
+
+    % Elevación en el emplazamiento TX (m s.n.m.)
+    if tiene_srtm
+        elev_tx = geointerp(elev_data, R, lat0, lon0, 'linear');
+        fprintf(' + corrección terreno SRTM\n');
+        terrain_desc = 'SRTM_30m_local';
+    else
+        elev_tx = 0;
+        fprintf(' (terreno plano)\n');
+        terrain_desc = 'plano';
+    end
 
     dist_km = sqrt( ((lons_flat - lon0) .* 111 .* cosd(lat0)).^2 + ...
                     ((lats_flat - lat0) .* 111).^2 );
-    dist_km  = max(dist_km, 0.01);   % mínimo 10 m para evitar log(0)
+    dist_km = max(dist_km, 0.01);
 
-    fc_MHz  = fc_Hz / 1e6;
-    a_hRx   = (1.1*log10(fc_MHz) - 0.7)*hRx_m - (1.56*log10(fc_MHz) - 0.8);
-    PL_dB   = 46.3 + 33.9*log10(fc_MHz) - 13.82*log10(hTx_m) - a_hRx ...
-            + (44.9 - 6.55*log10(hTx_m)) .* log10(dist_km) + 3;
+    fc_MHz = fc_Hz / 1e6;
+    a_hRx  = (1.1*log10(fc_MHz) - 0.7)*hRx_m - (1.56*log10(fc_MHz) - 0.8);
 
-    Prx_dBm    = EIRP_dBm + Grx_dBi - PL_dB;
-    Prx_dBm    = Prx_dBm(:);
-    modelo_usado = 'COST-231-Hata';
+    % Altura efectiva TX variable por punto receptor (SRTM o cero si no hay)
+    hTx_eff = max(hTx_m + (elev_tx - elev_grid), 5);
+    fprintf('  Altura efectiva Tx: [%.1f, %.1f] m (media: %.1f m)\n', ...
+        min(hTx_eff), max(hTx_eff), mean(hTx_eff));
+
+    PL_dB= 46.3 + 33.9*log10(fc_MHz) - 13.82*log10(hTx_eff) - a_hRx ...
+          + (44.9 - 6.55*log10(hTx_eff)) .* log10(dist_km) + 3;
+
+    Prx_dBm = EIRP_dBm + Grx_dBi - PL_dB;
+    Prx_dBm = Prx_dBm(:);
+
+    if tiene_srtm
+        modelo_usado = 'COST-231-Hata+SRTM';
+    else
+        modelo_usado = 'COST-231-Hata';
+    end
 end
 
 % --- FSPL — cota superior teórica (siempre calculada para referencia) ---
@@ -251,7 +316,7 @@ set(gca, 'YDir', 'normal');
 colormap(gca, jet);
 cb = colorbar;
 cb.Label.String = 'RSRP [dBm]';
-caxis([RSRP_min RSRP_max]);
+clim([RSRP_min RSRP_max]);
 xlabel('Longitud [°]'); ylabel('Latitud [°]');
 title('Mapa de Cobertura RSRP');
 hold on;
@@ -303,12 +368,8 @@ params.lat_emplazamiento = lat0;
 params.lon_emplazamiento = lon0;
 params.area_km           = areaKm;
 params.espaciado_grid_m  = gridSpacing_m;
-params.modelo_propagacion = modelo_usado;   % Asignado automáticamente en Block 4
-if tiene_srtm
-    params.datos_elevacion = 'SRTM_30m';
-else
-    params.datos_elevacion = 'plano';
-end
+params.modelo_propagacion = modelo_usado;     % asignado en Bloque 4
+params.datos_elevacion    = terrain_desc;    % asignado en Bloque 4
 
 % Nombre descriptivo de la simulación
 nombre_sim = sprintf('URJC_Fuenlabrada_%.1fGHz_%ddBm', fc_Hz/1e9, Ptx_dBm);
