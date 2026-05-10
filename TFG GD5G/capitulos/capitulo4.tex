@@ -1,28 +1,1012 @@
+% !TEX root = ../memoria.tex
 \chapter{Implementación}
 \label{cap:capitulo4}
 
 \section{Implementación de la Simulación en MATLAB}
 \label{sec:impl_matlab}
-\textit{Entorno: MATLAB R2024a, Antenna Toolbox, Windows/Ubuntu.\\
-Modelo Longley-Rice implementado: parámetros configurables (fc=3.5 GHz, P\_tx=40 dBm, área 3×3 km).\\
-Integración datos elevación SRTM 30m.\\
-Algoritmo cálculo: grid 50m spacing, 3600 puntos, \textasciitilde5-8 min ejecución.\\
-Script exportación JSON con UUID único.}
 
-\section{Implementación del Backend (Spring Boot)}
+\subsection{Visión general del motor de simulación}
+\label{sec:matlab_vision}
+
+La simulación radioeléctrica vive en dos ficheros: el script principal
+\texttt{simulacion\_cobertura\_5g.m} y la función \texttt{exportar\_json.m}, que se ocupa
+de serializar la salida. Entre los dos calculan el mapa de cobertura de un \textit{gNodeB}
+5G NR sobre una cuadrícula de $3 \times 3$~km y lo exportan en JSON para que el backend
+Spring Boot lo sirva sin ningún paso intermedio manual.
+
+Decidimos dividir el script en nueve bloques ejecutables de forma independiente porque
+durante el desarrollo fue clave poder validar cada paso por separado antes de encadenarlos.
+El Cuadro~\ref{tab:bloques_matlab} los resume.
+
+\begin{table}[H]
+\centering
+\caption{Estructura de bloques del script \texttt{simulacion\_cobertura\_5g.m}.}
+\label{tab:bloques_matlab}
+\small
+\begin{tabularx}{\textwidth}{|c|l|X|}
+\hline
+\textbf{Bloque} & \textbf{Nombre} & \textbf{Función} \\
+\hline
+0 & Limpieza del entorno        & \texttt{clear}, \texttt{clc}, \texttt{close all} \\
+1 & Parámetros de configuración & Define antena, frecuencia, potencia y cuadrícula \\
+2 & Cuadrícula de receptores    & Genera el \textit{meshgrid} de puntos de muestreo \\
+3 & Elevación SRTM              & Carga e interpola el MDT en la cuadrícula \\
+4 & Modelo de propagación       & Calcula $P_{rx}$ en cada punto (LR-ITM o COST-231) \\
+5 & Cálculo del RSRP            & Convierte $P_{rx}$ a RSRP según 3GPP TS 38.215 \\
+6 & Visualización               & Genera \textit{heatmaps} y estadísticas de cobertura \\
+7 & Exportación a JSON          & Serializa los resultados para el backend \\
+8 & Validación con FSPL         & Comprueba coherencia con la cota teórica \\
+\hline
+\end{tabularx}
+\end{table}
+
+El flujo es lineal: parámetros $\rightarrow$ cuadrícula $\rightarrow$ elevación
+$\rightarrow$ $P_{rx}$ $\rightarrow$ RSRP $\rightarrow$ JSON. El fichero de salida, nombrado
+con un UUID v4, es el único artefacto que cruza la frontera hacia el resto del sistema.
+
+\subsection{Parámetros del sistema radiante (Bloque 1)}
+\label{sec:matlab_params}
+
+Todos los parámetros configurables están agrupados al inicio del script para que sea fácil
+lanzar distintos escenarios sin buscar constantes dispersas por el código. El escenario de
+referencia modela un \textit{gNodeB} típico de la banda FR1 n78 (3,4--3,8~GHz), que es
+la banda de despliegue masivo de 5G en Europa, emplazado en el edificio de Rectorado del
+campus URJC de Fuenlabrada. Los valores del Cuadro~\ref{tab:params_antena} son representativos
+de una instalación real en azotea, no teóricos.
+
+\begin{table}[H]
+\centering
+\caption{Parámetros de la estación base (escenario URJC Fuenlabrada).}
+\label{tab:params_antena}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Parámetro} & \textbf{Símbolo} & \textbf{Valor} \\
+\hline
+Frecuencia central           & $f_c$         & 3,5~GHz (banda n78) \\
+Potencia de transmisión      & $P_{tx}$      & 40~dBm (10~W) \\
+Ganancia antena transmisora  & $G_{tx}$      & 15~dBi (sectorial) \\
+Ganancia antena receptora    & $G_{rx}$      & 0~dBi (omnidireccional) \\
+Pérdidas de cable            & $L_{cable}$   & 2~dB \\
+Altura antena transmisora    & $h_{Tx}$      & 30~m \\
+Altura antena receptora      & $h_{Rx}$      & 1,5~m \\
+Emplazamiento (latitud)      & $\phi_0$      & 40,2897°~N \\
+Emplazamiento (longitud)     & $\lambda_0$   & 3,8244°~W \\
+\hline
+\end{tabular}
+\end{table}
+
+Con estos valores, la EIRP queda en:
+
+\begin{equation}
+\text{EIRP} = P_{tx} + G_{tx} - L_{cable} = 40 + 15 - 2 = 53~\text{dBm}
+\label{eq:eirp}
+\end{equation}
+
+Para la cuadrícula optamos por 50~m de espaciado como compromiso entre resolución y tiempo
+de cómputo: con 3~km de lado obtenemos $60 \times 60 = 3600$ puntos, suficientes para ver
+gradientes a escala de manzana, y el cálculo Longley-Rice completo tarda unos 60~s en un
+portátil de gama media.
+
+\begin{lstlisting}[language=MATLAB, caption={Parámetros de configuración de la simulación (Bloque 1).}, label={cod:bloque1}]
+fc_Hz       = 3.5e9;        % Frecuencia central [Hz] - banda n78
+Ptx_dBm     = 40;           % Potencia de transmisión [dBm] = 10 W
+Ptx_W       = 10^((Ptx_dBm - 30) / 10);
+Gtx_dBi     = 15;           % Ganancia antena Tx [dBi]
+Grx_dBi     = 0;            % Ganancia antena Rx [dBi]
+hTx_m       = 30;           % Altura antena Tx [m]
+hRx_m       = 1.5;          % Altura antena Rx [m]
+L_cable_dB  = 2;            % Pérdidas de cable [dB]
+EIRP_dBm    = Ptx_dBm + Gtx_dBi - L_cable_dB;
+
+lat0 = 40.2897;   lon0 = -3.8244;   % Campus URJC Fuenlabrada
+areaKm        = 3;       % Lado del área cuadrada [km]
+gridSpacing_m = 50;      % Espaciado de la cuadrícula [m]
+nPuntos       = areaKm * 1000 / gridSpacing_m;  % 60
+\end{lstlisting}
+
+\subsection{Generación de la cuadrícula de receptores (Bloque 2)}
+\label{sec:matlab_grid}
+
+Para situar los 3600 receptores sobre el mapa hay que convertir el área en kilómetros a
+incrementos en grados geográficos. Usamos la aproximación lineal estándar para latitudes
+medias:
+
+\begin{equation}
+\Delta\phi = \frac{a/2}{111}~\text{grados}, \qquad
+\Delta\lambda = \frac{a/2}{111 \cdot \cos\phi_0}~\text{grados}
+\label{eq:deltas}
+\end{equation}
+
+donde $a = 3$~km. El error que introduce esta aproximación en la zona de Fuenlabrada
+($\phi_0 \approx 40°$) es menor del 0,1~\%, perfectamente asumible para nuestro propósito.
+
+Con \texttt{linspace} construimos los vectores de coordenadas y con \texttt{meshgrid}
+la cuadrícula 2D. Después aplanamos las matrices \texttt{LATS} y \texttt{LONS} a vectores
+columna de 3600 elementos, que entran directamente en los bloques de elevación y propagación.
+
+\begin{lstlisting}[language=MATLAB, caption={Generación de la cuadrícula de receptores (Bloque 2).}, label={cod:bloque2}]
+deltaLat_deg = (areaKm / 2) / 111;
+deltaLon_deg = (areaKm / 2) / (111 * cosd(lat0));
+
+lats_vec = linspace(lat0 - deltaLat_deg, lat0 + deltaLat_deg, nPuntos);
+lons_vec = linspace(lon0 - deltaLon_deg, lon0 + deltaLon_deg, nPuntos);
+
+[LONS, LATS] = meshgrid(lons_vec, lats_vec);
+lats_flat = LATS(:);   % Vectorizar: 3600 x 1
+lons_flat = LONS(:);
+\end{lstlisting}
+
+\subsection{Datos de elevación del terreno (Bloque 3)}
+\label{sec:matlab_srtm}
+
+Los datos de elevación vienen del SRTM (NASA/USGS). Elegimos el \textit{tile}
+\texttt{N40W004} porque cubre el área de Fuenlabrada con 30~m de resolución y se descarga
+gratis desde USGS EarthExplorer en formato GeoTIFF. Almacenamos el fichero en
+\texttt{matlab/data/srtm\_fuenlabrada.tif} para tenerlo junto al script.
+
+Para interpolar la elevación en cada punto de la cuadrícula usamos \texttt{readgeoraster}
+y \texttt{geointerp} del \textit{Mapping Toolbox}:
+
+\begin{lstlisting}[language=MATLAB, caption={Carga e interpolación del MDT SRTM (Bloque 3).}, label={cod:srtm}]
+[elev_data, R] = readgeoraster(srtm_file);
+elev_data = double(elev_data);
+elev_data(elev_data < -100) = 0;          % Eliminar valores sin dato
+elev_grid = geointerp(elev_data, R, lats_flat, lons_flat, 'linear');
+\end{lstlisting}
+
+Si el fichero no está disponible, el script avisa con un \textit{warning} y sustituye
+\texttt{elev\_grid} por ceros, asumiendo terreno plano. Esto resultó muy útil en las
+primeras fases del desarrollo, cuando todavía no habíamos descargado el tile. La variable
+\texttt{tiene\_srtm} registra cuál de los dos caminos se tomó y queda reflejada en el campo
+\texttt{"terrain\_data"} del JSON de salida.
+
+\subsection{Modelo de propagación radioeléctrica (Bloque 4)}
+\label{sec:matlab_propagacion}
+
+Este es el bloque central: calcula $P_{rx}$ en los 3600 puntos aplicando un modelo de
+propagación semiempírico. Al arrancar, el script comprueba qué \textit{toolboxes} están
+instalados y selecciona el mejor disponible automáticamente.
+
+\subsubsection{Modelo Longley-Rice (ITM)}
+\label{sec:matlab_lr}
+
+Elegimos el \textit{Irregular Terrain Model} (ITM) o modelo Longley-Rice
+\cite{longley1968transmission} como modelo principal porque es el único de los disponibles
+en MATLAB que incorpora el perfil real del terreno en el cálculo de pérdidas. A diferencia
+de los modelos puramente empíricos, evalúa la difracción sobre las irregularidades del
+terreno (parametrizada por $\Delta h$), la reflexión en el suelo y la curvatura de la
+Tierra para cada enlace TX-RX individual. Para redes desplegables en entornos con orografía
+variable, ignorar eso sería un error de bulto.
+
+El modelo, desarrollado por A.~G.~Longley e Y.~T.~Rice en 1968 en el ITS de la NTIA, lleva
+décadas siendo la referencia en planificación de redes de radiodifusión y telecomunicaciones
+militares. En MATLAB está disponible desde R2019b a través del \textit{Communications Toolbox}:
+
+\begin{lstlisting}[language=MATLAB, caption={Cálculo con Longley-Rice ITM (Bloque 4).}, label={cod:lr}]
+tx = txsite('Name', 'gNodeB_URJC', ...
+    'Latitude',             lat0,  'Longitude',       lon0, ...
+    'AntennaHeight',        hTx_m, 'TransmitterFrequency', fc_Hz, ...
+    'TransmitterPower',     Ptx_W);
+
+pm = propagationModel('longley-rice');
+
+rx_sites = rxsite('Latitude',      lats_flat, ...
+                  'Longitude',     lons_flat, ...
+                  'AntennaHeight', hRx_m);
+
+Prx_dBm = sigstrength(rx_sites, tx, pm);
+\end{lstlisting}
+
+\texttt{sigstrength} devuelve $P_{rx}$ en dBm para cada receptor usando internamente un
+MDT SRTM a 90~m de resolución que el \textit{toolbox} lleva de serie. Cuando cargamos nuestro
+tile local de 30~m a través de un \texttt{siteviewer}, ese MDT global queda sustituido y
+la precisión en la zona de estudio mejora notablemente. Integrar el tile propio es, de hecho,
+la mejora técnica central de este TFG frente a usar el modelo con su terreno por defecto.
+
+\subsubsection{COST-231 Hata como modelo de respaldo}
+\label{sec:matlab_cost231}
+
+Cuando el \textit{Communications Toolbox} no está instalado, el script cae en COST-231 Hata
+extendido \cite{cost231finalreport1999}. Es un modelo de bolsillo: solo necesita las
+funciones matemáticas básicas de MATLAB y el cálculo es casi instantáneo. La fórmula de
+pérdidas para entorno urbano medio ($C_m = 3$~dB) es:
+
+\begin{equation}
+L_{50}~[\text{dB}] = 46{,}3 + 33{,}9 \log_{10}f_c - 13{,}82 \log_{10}h_{Tx}
+                   - a(h_{Rx}) + (44{,}9 - 6{,}55 \log_{10}h_{Tx})\log_{10}d + C_m
+\label{eq:cost231}
+\end{equation}
+
+con $f_c$ en MHz, $d$ en km y $a(h_{Rx})$ el factor de corrección de la antena receptora:
+
+\begin{equation}
+a(h_{Rx}) = (1{,}1 \log_{10}f_c - 0{,}7)\,h_{Rx} - (1{,}56 \log_{10}f_c - 0{,}8)
+\label{eq:a_hrx}
+\end{equation}
+
+De ahí, $P_{rx} = \text{EIRP} + G_{rx} - L_{50}$.
+
+El problema es que COST-231 Hata fue calibrado para 1500--2000~MHz. A 3,5~GHz se empieza
+a quedar corto: según la literatura introduce entre 2 y 4~dB de error extra respecto a
+medidas reales, lo que en términos de cobertura puede suponer 100--200~m de diferencia en
+el borde de celda. Por eso lo usamos solo como respaldo, no como resultado.
+
+\subsubsection{FSPL como referencia teórica}
+\label{sec:matlab_fspl}
+
+Sea cual sea el modelo activo, siempre calculamos también el FSPL (\textit{Free Space
+Path Loss}) como cota superior teórica:
+
+\begin{equation}
+\text{FSPL}~[\text{dB}] = 20\log_{10}d + 20\log_{10}f_c + 20\log_{10}\!\left(\frac{4\pi}{c}\right)
+\label{eq:fspl}
+\end{equation}
+
+donde $d$ está en metros y $f_c$ en Hz. La diferencia entre el FSPL y el modelo activo
+cuantifica directamente el efecto del terreno y del entorno sobre la propagación. Esta
+comparación la visualizamos en el bloque 8 y sirve de base para la figura de la
+el Capítulo~\ref{cap:capitulo5}.
+
+\subsection{Cálculo del RSRP (Bloque 5)}
+\label{sec:matlab_rsrp}
+
+$P_{rx}$ representa la potencia total integrada sobre todo el ancho de banda del canal,
+pero lo que miden los terminales 5G NR es el RSRP (\textit{Reference Signal Received
+Power}): la potencia promedio en los \textit{Resource Elements} que transportan el
+\textit{Synchronization Signal Block}, según 3GPP TS 38.215. Para pasar de una magnitud
+a la otra hay que normalizar por el número de RE del canal:
+
+\begin{equation}
+\text{RSRP}~[\text{dBm}] = P_{rx}~[\text{dBm}] - 10\log_{10}(N_{RB} \cdot 12)
+\label{eq:rsrp}
+\end{equation}
+
+donde el factor 12 es el número de subportadoras por \textit{Resource Block}. Para n78
+con 100~MHz de ancho de banda y SCS de 30~kHz, 3GPP TS 38.104 fija $N_{RB} = 66$, así
+que la corrección vale:
+
+\begin{equation}
+\Delta_{\text{RSRP}} = 10\log_{10}(66 \times 12) = 10\log_{10}(792) \approx 29{,}8~\text{dB}
+\label{eq:delta_rsrp}
+\end{equation}
+
+Los valores resultantes se clampean al rango $[-140, -40]$~dBm y se reconstruyen en
+matriz $60 \times 60$ para visualización y exportación. En el Cuadro~\ref{tab:rsrp_umbrales}
+recogemos los umbrales de clasificación que usamos en el \textit{heatmap}, extraídos de
+los criterios de KPI de 3GPP para 5G NR.
+
+\begin{lstlisting}[language=MATLAB, caption={Cálculo del RSRP a partir de $P_{rx}$ (Bloque 5).}, label={cod:bloque5}]
+NRB_100MHz = 66;           % Resource Blocks para 100 MHz, SCS=30 kHz
+delta_RSRP_dB = 10 * log10(NRB_100MHz * 12);  % aprox 29.0 dB
+
+RSRP_dBm = Prx_dBm - delta_RSRP_dB;
+
+RSRP_min = -140;  RSRP_max = -40;           % Límites físicos
+RSRP_dBm = max(min(RSRP_dBm, RSRP_max), RSRP_min);
+
+RSRP_grid = reshape(RSRP_dBm, nPuntos, nPuntos);
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Clasificación de la cobertura en función del RSRP (3GPP).}
+\label{tab:rsrp_umbrales}
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Categoría} & \textbf{Rango RSRP} & \textbf{Descripción} \\
+\hline
+Excelente     & $\geq -80$~dBm          & Muy buena calidad, velocidades máximas \\
+Buena         & $[-90, -80)$~dBm        & Calidad adecuada para todos los servicios \\
+Aceptable     & $[-100, -90)$~dBm       & Cobertura funcional, velocidades reducidas \\
+Débil         & $[-110, -100)$~dBm      & Cobertura marginal, posibles cortes \\
+Sin cobertura & $< -110$~dBm            & Señal insuficiente para establecer conexión \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Exportación de resultados a JSON (Bloque 7)}
+\label{sec:matlab_json}
+
+Con el RSRP calculado, el bloque 7 llama a \texttt{exportar\_json.m}. La función genera
+un UUID v4 vía la JVM integrada en MATLAB (\texttt{java.util.UUID.randomUUID()}), empaqueta
+los metadatos y los puntos de cobertura en una estructura, serializa todo con
+\texttt{jsonencode} y escribe el fichero en \texttt{matlab/output/<uuid>.json}. No hay
+dependencias externas: la JVM viene de serie con cualquier instalación de MATLAB.
+
+El formato de salida lo diseñamos para que el backend Spring Boot pueda leerlo sin
+transformaciones intermedias:
+
+\begin{lstlisting}[caption={Estructura del fichero JSON generado por \texttt{exportar\_json.m}.}, label={cod:json}]
+{
+  "id": "a3f7c2b1-...",
+  "name": "URJC_Fuenlabrada_3.5GHz_40dBm",
+  "createdAt": "2026-04-15T12:00:00Z",
+  "metadata": {
+    "frequency_ghz": 3.5,
+    "tx_power_dbm": 40,
+    "antenna_height_m": 30,
+    "tx_location": { "latitude": 40.2897, "longitude": -3.8244 },
+    "model": "Longley-Rice",
+    "terrain_data": "SRTM_30m"
+  },
+  "coveragePoints": [
+    { "lat": 40.2764, "lng": -3.8356, "rsrp": -97.4 },
+    ...
+  ]
+}
+\end{lstlisting}
+
+El array \texttt{coveragePoints} solo incluye los puntos con RSRP superior a $-130$~dBm;
+los puntos por debajo de ese umbral no aportan información útil al \textit{heatmap} y
+engordan el fichero innecesariamente. Para la cuadrícula de 3600 puntos del escenario URJC,
+el JSON resultante ocupa entre 300 y 500~KB según cuántos puntos queden fuera del umbral.
+
+El Listado~\ref{cod:exportar_json} muestra el núcleo de la función
+\texttt{exportar\_json.m}: la generación del UUID, la construcción de la estructura
+y la serialización. La función valida las entradas, genera la marca de tiempo en
+formato ISO~8601 con zona horaria UTC y escribe el fichero en la carpeta
+\texttt{matlab/output/}.
+
+\begin{lstlisting}[language=MATLAB, caption={Fragmento principal de \texttt{exportar\_json.m}.}, label={cod:exportar_json}]
+function fichero_json = exportar_json(nombre, lats, lons, rsrp_dBm, params)
+    rsrp_dBm = max(min(double(rsrp_dBm), -40), -140);  % Clamp
+    uuid     = char(java.util.UUID.randomUUID().toString());
+    ahora    = datetime('now', 'TimeZone', 'UTC');
+    createdAt = char(ahora, "yyyy-MM-dd'T'HH:mm:ss'Z'");
+
+    metadata.frequency_ghz    = double(params.frecuencia_GHz);
+    metadata.tx_power_dbm     = double(params.potencia_tx_dBm);
+    metadata.antenna_height_m = double(params.altura_tx_m);
+    metadata.tx_location      = struct('latitude',  params.lat_emplazamiento, ...
+                                       'longitude', params.lon_emplazamiento);
+    metadata.model            = char(string(params.modelo_propagacion));
+    metadata.terrain_data     = char(string(params.datos_elevacion));
+
+    idx_validos = rsrp_dBm >= -130;  % Filtrar puntos sin señal útil
+    coveragePoints = struct('lat', num2cell(lats(idx_validos)), ...
+                            'lng', num2cell(lons(idx_validos)), ...
+                            'rsrp', num2cell(rsrp_dBm(idx_validos)));
+
+    sim_struct = struct('id', uuid, 'name', nombre, ...
+        'createdAt', createdAt, 'metadata', metadata, ...
+        'coveragePoints', coveragePoints);
+
+    json_str = jsonencode(sim_struct, 'PrettyPrint', true);
+    fichero_json = fullfile(output_dir, [uuid, '.json']);
+    fid = fopen(fichero_json, 'w', 'n', 'UTF-8');
+    fprintf(fid, '%s', json_str);  fclose(fid);
+end
+\end{lstlisting}
+
+\section{Backend: API REST con Spring Boot}
 \label{sec:impl_backend}
-\textit{Configuración proyecto: Spring Initializr, Java 17, Maven.\\
-Estructura paquetes: controller, service, model, exception, config.\\
-SimulationController: endpoints REST con @RestController, manejo excepciones, CORS.\\
-SimulationService: lógica negocio, lectura archivos, parsing JSON con Jackson.}
 
-\section{Implementación del Frontend (Angular)}
+El backend tiene una única responsabilidad: exponer los ficheros JSON generados por
+MATLAB como recursos accesibles vía HTTP para que el frontend pueda consumirlos. Para
+ello se diseñó una API REST sin estado (\textit{stateless}) con Spring Boot~3.2.4 y
+Java~17, empaquetada como un JAR ejecutable que no requiere servidor de aplicaciones
+externo.
+
+\subsection{Estructura del proyecto}
+\label{sec:backend_estructura}
+
+El proyecto sigue la estructura canónica de Maven con Spring Boot. El fichero
+\texttt{pom.xml} declara tres dependencias principales: \texttt{spring-boot-starter-web}
+(servidor embebido Tomcat, Jackson para JSON y el framework web de Spring MVC),
+\texttt{springdoc-openapi-starter-webmvc-ui}~2.3.0 (generación automática de la
+documentación OpenAPI~3 y la interfaz Swagger~UI) y \texttt{spring-boot-starter-test}
+(JUnit~5, Mockito y utilidades de test de Spring).
+
+El código Java se organiza en cinco paquetes siguiendo el patrón clásico de capas:
+
+\begin{table}[H]
+\centering
+\caption{Estructura de paquetes del backend.}
+\label{tab:backend_paquetes}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Paquete} & \textbf{Responsabilidad} \\
+\hline
+\texttt{controller} & Controlador REST: define endpoints y formato de respuesta \\
+\texttt{service}    & Lógica de negocio: lectura y validación de ficheros JSON \\
+\texttt{model}      & DTOs: \texttt{SimulationSummaryDto} (record Java) \\
+\texttt{exception}  & Excepciones de dominio y manejador global \\
+\texttt{config}     & Configuración CORS para desarrollo local \\
+\hline
+\end{tabular}
+\end{table}
+
+La clase de arranque \texttt{Gemelo5gApplication} es un \texttt{@SpringBootApplication}
+estándar que delega en \texttt{SpringApplication.run()} el escaneo de componentes y la
+configuración automática del contenedor.
+
+\subsection{Servicio de simulaciones}
+\label{sec:backend_service}
+
+\texttt{SimulationService} es el componente central del backend. Anotado con
+\texttt{@Service}, recibe por inyección de dependencias la ruta del directorio de datos
+(propiedad \texttt{simulations.data-dir} de \texttt{application.properties}) y un
+\texttt{ObjectMapper} de Jackson para la deserialización JSON.
+
+El directorio de datos se normaliza en el constructor con
+\texttt{Paths.get(path).toAbsolutePath().normalize()} para prevenir ataques de
+\textit{path traversal}: cualquier ruta resuelta que no empiece por el directorio base
+se rechaza con un \texttt{SimulationNotFoundException}. Además, antes de acceder al
+sistema de ficheros, el método \texttt{getById} valida que el identificador recibido
+sea un UUID~v4 conforme a RFC~4122 mediante la expresión regular:
+
+\begin{center}
+\texttt{[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}}
+\end{center}
+
+Si el identificador no supera ninguna de las dos validaciones, se lanza la misma
+excepción para no revelar información sobre la estructura del sistema de ficheros.
+
+\begin{lstlisting}[language=Java, caption={Métodos principales de \texttt{SimulationService}.}, label={cod:service}]
+@Service
+public class SimulationService {
+    private final Path dataDir;
+    private final ObjectMapper mapper;
+
+    public SimulationService(
+            @Value("${simulations.data-dir}") String dataDirPath,
+            ObjectMapper mapper) {
+        this.dataDir = Paths.get(dataDirPath).toAbsolutePath().normalize();
+        this.mapper  = mapper;
+    }
+
+    public List<SimulationSummaryDto> listAll() throws IOException {
+        if (!Files.isDirectory(dataDir)) return List.of();
+        try (Stream<Path> files = Files.list(dataDir)) {
+            return files.filter(p -> p.toString().endsWith(".json"))
+                        .map(this::parseSummary).toList();
+        }
+    }
+
+    private static final String UUID_REGEX =
+        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
+      + "-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
+    public JsonNode getById(String id) throws IOException {
+        if (!id.matches(UUID_REGEX))
+            throw new SimulationNotFoundException(id);
+        Path file = dataDir.resolve(id + ".json").normalize();
+        if (!file.startsWith(dataDir) || !Files.exists(file))
+            throw new SimulationNotFoundException(id);
+        return mapper.readTree(file.toFile());
+    }
+}
+\end{lstlisting}
+
+El método \texttt{listAll} recorre el directorio con \texttt{Files.list()}, filtra los
+ficheros \texttt{.json} y mapea cada uno a un \texttt{SimulationSummaryDto} que contiene
+solo los campos ligeros (\texttt{id}, \texttt{name}, \texttt{createdAt},
+\texttt{metadata}), sin incluir el array \texttt{coveragePoints}. De este modo, el
+listado no satura al cliente cuando hay múltiples simulaciones almacenadas.
+
+\subsection{Controlador REST}
+\label{sec:backend_controller}
+
+\texttt{SimulationController} expone tres endpoints bajo el prefijo
+\texttt{/api/simulations}, todos de solo lectura (GET). El Cuadro~\ref{tab:endpoints}
+los resume.
+
+\begin{table}[H]
+\centering
+\caption{Endpoints de la API REST.}
+\label{tab:endpoints}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Método} & \textbf{URL} & \textbf{Descripción} \\
+\hline
+GET & \texttt{/api/simulations}            & Listado de simulaciones (sin puntos) \\
+GET & \texttt{/api/simulations/\{id\}}     & JSON completo con \texttt{coveragePoints} \\
+GET & \texttt{/api/simulations/\{id\}/export} & Descarga como fichero adjunto \\
+\hline
+\end{tabular}
+\end{table}
+
+El endpoint de listado soporta paginación opcional: si el cliente envía los parámetros
+\texttt{?page=0\&size=10}, el controlador calcula los índices de corte sobre la lista
+completa y devuelve un DTO \texttt{PageResponse} con los campos \texttt{content},
+\texttt{totalElements}, \texttt{page}, \texttt{size} y \texttt{totalPages}. Si no se
+envía el parámetro \texttt{page}, devuelve la lista completa para mantener la
+compatibilidad con clientes simples.
+
+\begin{lstlisting}[language=Java, caption={Endpoints del controlador REST.}, label={cod:controller}]
+@RestController
+@RequestMapping("/api/simulations")
+public class SimulationController {
+    private final SimulationService service;
+
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listSimulations(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "10") int size)
+            throws IOException {
+        List<SimulationSummaryDto> all = service.listAll();
+        if (page == null) return ResponseEntity.ok(all);
+        int total = all.size();
+        int from  = Math.min(page * size, total);
+        int to    = Math.min(from + size, total);
+        return ResponseEntity.ok(
+            new PageResponse<>(all.subList(from, to), total, page, size,
+                (int) Math.ceil((double) total / size)));
+    }
+
+    @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public JsonNode getSimulation(@PathVariable String id) throws IOException {
+        return service.getById(id);
+    }
+
+    @GetMapping(value = "/{id}/export", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Resource> exportSimulation(@PathVariable String id)
+            throws IOException {
+        Resource resource = service.getFileResource(id);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + id + ".json\"")
+            .body(resource);
+    }
+}
+\end{lstlisting}
+
+El endpoint de exportación añade la cabecera \texttt{Content-Disposition: attachment}
+para que el navegador descargue el JSON como fichero en vez de mostrarlo en línea.
+Internamente delega en \texttt{SimulationService.getFileResource()}, que devuelve un
+\texttt{FileSystemResource} apuntando al fichero original.
+
+\subsection{Gestión de errores}
+\label{sec:backend_errores}
+
+La gestión centralizada de errores se apoya en dos clases. Primero,
+\texttt{SimulationNotFoundException} extiende \texttt{RuntimeException} y lleva la
+anotación \texttt{@ResponseStatus(HttpStatus.NOT\_FOUND)}: cuando se lanza, Spring
+devuelve automáticamente un código 404. Segundo, \texttt{GlobalExceptionHandler}
+(anotado con \texttt{@RestControllerAdvice}) captura las excepciones no manejadas y
+las transforma en respuestas JSON consistentes con estructura
+\texttt{\{"error": "...", "detail": "..."\}}:
+
+\begin{lstlisting}[language=Java, caption={Manejador global de excepciones.}, label={cod:exception}]
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(SimulationNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handleNotFound(SimulationNotFoundException ex) {
+        return Map.of("error", "Simulacion no encontrada",
+                      "detail", ex.getMessage());
+    }
+
+    @ExceptionHandler(IOException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Map<String, String> handleIoException(IOException ex) {
+        return Map.of("error", "Error leyendo datos de simulacion",
+                      "detail", ex.getMessage());
+    }
+}
+\end{lstlisting}
+
+Este diseño garantiza que el frontend siempre recibe un JSON interpretable, nunca
+una traza de pila ni una página de error HTML por defecto de Spring.
+
+\subsection{Configuración y CORS}
+\label{sec:backend_config}
+
+El fichero \texttt{application.properties} contiene tres grupos de configuración:
+
+\begin{lstlisting}[caption={Configuración del backend (\texttt{application.properties}).}, label={cod:appprops}]
+server.port=8080
+simulations.data-dir=../matlab/output
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/api-docs
+\end{lstlisting}
+
+La propiedad \texttt{simulations.data-dir} apunta por defecto al directorio
+\texttt{matlab/output} relativo a la carpeta del backend, de modo que el servidor
+lee directamente los JSON que genera MATLAB sin copia intermedia. En producción o en
+entornos con rutas distintas, basta con cambiar esta propiedad o pasarla como variable
+de entorno (\texttt{SIMULATIONS\_DATA\_DIR}).
+
+La clase \texttt{CorsConfig} registra una política CORS que permite peticiones desde
+\texttt{http://localhost:4200} (el servidor de desarrollo de Angular) con los métodos
+\texttt{GET} y \texttt{OPTIONS}. Esta configuración es imprescindible durante el
+desarrollo local, ya que navegador y backend corren en puertos distintos y sin la
+cabecera \texttt{Access-Control-Allow-Origin} el navegador bloquearía las peticiones.
+
+Finalmente, \texttt{springdoc-openapi} genera automáticamente la especificación
+OpenAPI~3 a partir de las anotaciones \texttt{@Operation} y \texttt{@Tag} del
+controlador. La interfaz Swagger~UI queda accesible en
+\texttt{http://localhost:8080/swagger-ui.html} y permite probar los endpoints
+directamente desde el navegador sin necesidad de herramientas externas como Postman.
+
+\subsection{Tests unitarios}
+\label{sec:backend_tests}
+
+El servicio de simulaciones cuenta con once tests unitarios escritos con JUnit~5. La
+anotación \texttt{@TempDir} de JUnit crea un directorio temporal limpio antes de cada
+test, lo que garantiza el aislamiento entre ejecuciones. Los casos de prueba se agrupan
+en tres categorías:
+
+\begin{table}[H]
+\centering
+\caption{Resumen de los tests unitarios del backend.}
+\label{tab:tests_backend}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Método} & \textbf{Caso} & \textbf{Resultado esperado} \\
+\hline
+\texttt{getById} & UUID válido con fichero existente  & Devuelve \texttt{JsonNode} correcto \\
+\texttt{getById} & UUID válido pero fichero inexistente & \texttt{SimulationNotFoundException} \\
+\texttt{getById} & Formato de UUID no válido           & \texttt{SimulationNotFoundException} \\
+\texttt{getById} & Intento de \textit{path traversal}  & \texttt{SimulationNotFoundException} \\
+\texttt{listAll} & Directorio vacío                    & Lista vacía \\
+\texttt{listAll} & Directorio con JSON y no-JSON        & Solo devuelve los \texttt{.json} \\
+\texttt{getFileResource} & UUID válido                 & Recurso legible \\
+\texttt{getFileResource} & Formato inválido            & \texttt{SimulationNotFoundException} \\
+\hline
+\end{tabularx}
+\end{table}
+
+Los tests de \textit{path traversal} verifican que cadenas como
+\texttt{../.../etc/passwd} o prefijos con secuencias codificadas
+(\texttt{\%2F}) son rechazadas antes de tocar el sistema de ficheros, validando
+así la defensa en profundidad implementada en \texttt{SimulationService}.
+
+\section{Frontend: Aplicación Angular}
 \label{sec:impl_frontend}
-\textit{SimulationService: comunicación con API vía HttpClient, manejo errores RxJS.\\
-MapComponent: inicialización Leaflet, tiles OSM, carga heatmap con leaflet.heat.\\
-Normalización RSRP [-140, -40] → para gradiente colores.\\
-Actualización heatmap en tiempo real según filtro slider.}
 
-\section{Integración del Sistema}
-\label{sec:integracion}
-\textit{Flujo completo: MATLAB → copia manual JSON → backend arranca → frontend consume API → renderizado heatmap.}
+La capa de presentación es una aplicación web monopágina (\textit{Single Page
+Application}) construida con Angular~17 y TypeScript~5.9. Su función es consumir la
+API REST del backend y representar los datos de cobertura como un \textit{heatmap}
+interactivo sobre un mapa geográfico. A diferencia de versiones anteriores de Angular,
+la aplicación utiliza exclusivamente componentes \textit{standalone} (sin
+\texttt{NgModule}) y gestión de estado basada en \textit{signals}, siguiendo las
+prácticas recomendadas a partir de Angular~16.
+
+\subsection{Arquitectura de componentes}
+\label{sec:frontend_componentes}
+
+La aplicación está compuesta por siete componentes, cada uno independiente y declarado
+con \texttt{standalone:~true}. El Cuadro~\ref{tab:componentes_angular} los enumera junto
+con su responsabilidad.
+
+\begin{table}[H]
+\centering
+\caption{Componentes de la aplicación Angular.}
+\label{tab:componentes_angular}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Componente} & \textbf{Responsabilidad} \\
+\hline
+\texttt{HeaderComponent}           & Barra superior con título y toggle de tema \\
+\texttt{SidebarComponent}          & Selector de simulación, filtro RSRP, estadísticas \\
+\texttt{MapComponent}              & Mapa Leaflet con \textit{heatmap} y marcador TX \\
+\texttt{InfoPanelComponent}        & Detalle del punto seleccionado al hacer clic \\
+\texttt{StatsPanelComponent}       & Resumen estadístico de la simulación activa \\
+\texttt{CoverageLegendComponent}   & Leyenda de colores del \textit{heatmap} \\
+\texttt{SimulationConfigComponent} & Parámetros de configuración de la simulación \\
+\hline
+\end{tabular}
+\end{table}
+
+\texttt{AppComponent} actúa como raíz: importa los componentes
+\texttt{Header}, \texttt{Sidebar}, \texttt{Map} e \texttt{InfoPanel}, y en su
+método \texttt{ngOnInit} invoca \texttt{SimulationService.loadSimulations()} para
+cargar el listado inicial desde el backend. Si la petición falla, se muestra un
+\textit{banner} de error con botón de reintento que vuelve a llamar al mismo método.
+
+\subsection{Servicio de simulaciones}
+\label{sec:frontend_service}
+
+\texttt{SimulationService} centraliza toda la comunicación con la API y el estado
+de la aplicación. Está registrado con \texttt{providedIn:~'root'}, lo que lo convierte
+en un \textit{singleton} inyectable en cualquier componente.
+
+El estado interno se gestiona con cinco \textit{signals} de escritura
+(\texttt{WritableSignal}): \texttt{simulations} (lista cargada),
+\texttt{selectedSimulationId} (UUID activo), \texttt{rsrpThreshold} (umbral del
+filtro, inicializado a $-140$~dBm), \texttt{selectedPoint} (punto clicado en el
+mapa), \texttt{loading} y \texttt{error}. A partir de ellos se derivan cuatro
+\textit{computed signals} de solo lectura, entre los que destaca
+\texttt{filteredCoveragePoints}:
+
+\begin{lstlisting}[language=JavaScript, caption={Servicio de simulaciones (fragmento de \texttt{simulation.service.ts}).}, label={cod:sim_service}]
+@Injectable({ providedIn: 'root' })
+export class SimulationService {
+  private readonly http = inject(HttpClient);
+  private simulations        = signal<Simulation[]>([]);
+  private selectedSimulationId = signal<string | null>(null);
+  private rsrpThreshold      = signal<number>(-140);
+  readonly loading           = signal<boolean>(false);
+  readonly error             = signal<string | null>(null);
+
+  readonly filteredCoveragePoints = computed(() => {
+    const sim = this.currentSimulation();
+    const thr = this.rsrpThreshold();
+    if (!sim) return [];
+    return sim.coverage_points.filter(p => p.rsrp_dbm >= thr);
+  });
+
+  async loadSimulations(): Promise<void> {
+    this.loading.set(true);  this.error.set(null);
+    try {
+      const summaries = await firstValueFrom(
+        this.http.get<ApiSimulationSummary[]>(API_BASE));
+      const partial: Simulation[] = summaries.map(s => ({
+        simulation_id: s.id, metadata: s.metadata,
+        coverage_area: { width_km: 3, height_km: 3, grid_spacing_m: 50 },
+        coverage_points: []
+      }));
+      this.simulations.set(partial);
+      if (partial.length > 0)
+        await this.selectSimulation(partial[0].simulation_id);
+    } catch (e) {
+      this.error.set('No se pudo conectar con el backend.');
+    } finally { this.loading.set(false); }
+  }
+}
+\end{lstlisting}
+
+El flujo de carga opera en dos fases: primero se solicitan los resúmenes (sin
+\texttt{coveragePoints}) para rellenar el selector del \textit{sidebar}; al
+seleccionar una simulación, se pide el JSON completo con los puntos de cobertura
+y se actualiza la lista reactiva con \texttt{simulations.update()}. Este patrón
+evita transferir datos pesados hasta que el usuario los necesita realmente.
+
+La función \texttt{normalizeRsrp} convierte el valor RSRP al rango $[0, 1]$ para
+el gradiente del \textit{heatmap} mediante la expresión
+$(\text{RSRP} + 140) / 100$, donde $-140$~dBm se mapea a 0 y $-40$~dBm a 1.
+
+\subsection{Componente de mapa}
+\label{sec:frontend_mapa}
+
+\texttt{MapComponent} es el componente más complejo de la interfaz. Integra la
+librería Leaflet~1.9.4 con el \textit{plugin} \texttt{leaflet.heat} para renderizar
+el mapa de calor de cobertura sobre tiles cartográficos de CARTO (\textit{dark\_all}).
+
+El mapa se inicializa en \texttt{ngOnInit} centrado en las coordenadas del campus
+URJC (40,2897°~N, 3,8244°~W) con zoom 13. Un \texttt{effect()} de Angular observa
+los cambios en \texttt{filteredCoveragePoints} y en \texttt{currentSimulation}: cada
+vez que alguno de esos \textit{signals} cambia, se reconstruye el \textit{heatmap}
+automáticamente.
+
+\begin{lstlisting}[language=JavaScript, caption={Renderizado del \textit{heatmap} de cobertura.}, label={cod:heatmap}]
+private updateHeatmap(points: CoveragePoint[]): void {
+  if (this.heatmapLayer) {
+    this.map.removeLayer(this.heatmapLayer);
+    this.heatmapLayer = null;
+  }
+  if (!this.heatmapVisible || points.length === 0) return;
+
+  const heatData: [number, number, number][] = points.map(p => [
+    p.latitude,
+    p.longitude,
+    this.simulationService.normalizeRsrp(p.rsrp_dbm)  // (rsrp+140)/100
+  ]);
+
+  this.heatmapLayer = (L as any).heatLayer(heatData, {
+    radius: 18,  blur: 15,  maxZoom: 17,  max: 1.0,
+    gradient: {
+      0.0:  '#ef4444',   // Debil    (< -100 dBm)
+      0.4:  '#f97316',   // Aceptable(-100..-85)
+      0.55: '#fbbf24',   // Bueno    (-85..-70)
+      0.7:  '#10b981'    // Excelente (> -70 dBm)
+    }
+  });
+  this.heatmapLayer.addTo(this.map);
+}
+\end{lstlisting}
+
+El gradiente de colores replica los umbrales de clasificación del
+Cuadro~\ref{tab:rsrp_umbrales}: rojo para señal débil, naranja para aceptable,
+amarillo para buena y verde para excelente. \texttt{leaflet.heat} dibuja todos los
+puntos en un único elemento \texttt{<canvas>}, lo que permite renderizar los 3600
+puntos de la cuadrícula sin penalización visible de rendimiento.
+
+El manejador de \textit{click} del mapa busca el punto de cobertura más cercano
+al lugar pulsado mediante distancia euclidiana en grados. Si la distancia es inferior
+a 0,003° (aproximadamente 300~m), selecciona el punto y el \texttt{InfoPanelComponent}
+muestra su RSRP, coordenadas y \textit{path loss} estimado. En caso contrario, se
+deselecciona cualquier punto previo.
+
+\subsection{Interfaz de usuario}
+\label{sec:frontend_ui}
+
+La aplicación ofrece un cambio de tema claro/oscuro gestionado por
+\texttt{ThemeService}. Este servicio mantiene un \textit{signal} booleano
+(\texttt{darkMode}), persiste la preferencia en \texttt{localStorage} con la clave
+\texttt{gd5g-theme} y aplica la clase CSS \texttt{theme-light} al \texttt{<body>}
+cuando el usuario alterna al modo claro. El tema oscuro es el predeterminado, ya que
+los mapas con tiles CARTO \textit{dark\_all} se integran mejor visualmente con fondos
+oscuros.
+
+El \textit{sidebar} izquierdo ofrece tres controles principales: un selector
+\texttt{<select>} que lista las simulaciones disponibles (por nombre de escenario o
+UUID), un deslizador (\textit{slider}) de rango $[-140, -40]$~dBm que filtra en
+tiempo real los puntos visibles en el \textit{heatmap}, y un contador que muestra
+cuántos puntos pasan el filtro respecto al total.
+
+El \texttt{InfoPanelComponent} se activa al hacer clic en un punto del mapa y muestra
+el nivel RSRP con un indicador visual de barras (1 a 4 barras activas según la calidad),
+las coordenadas geográficas exactas, el rango de umbrales 3GPP y una estimación del
+\textit{path loss}: $PL \approx \text{EIRP} - \text{RSRP}$, donde $\text{EIRP}$ se
+aproxima como $P_{tx} + 13$~dB a partir de los metadatos de la simulación.
+
+\subsection{Gestión del estado con \textit{signals}}
+\label{sec:frontend_signals}
+
+Angular introdujo los \textit{signals} en la versión~16 como alternativa a la gestión
+de estado basada en \texttt{Observable} de RxJS o librerías externas como NgRx. En
+esta aplicación hemos adoptado \textit{signals} de forma integral por tres razones:
+
+\begin{enumerate}
+\item \textbf{Simplicidad}: un \texttt{WritableSignal<T>} se lee como una función
+  (\texttt{signal()}) y se escribe con \texttt{signal.set()} o
+  \texttt{signal.update()}, sin necesidad de suscripciones ni operadores.
+\item \textbf{Derivación reactiva}: \texttt{computed()} crea valores derivados que
+  Angular recalcula automáticamente cuando sus dependencias cambian. En nuestro caso,
+  \texttt{filteredCoveragePoints} depende de \texttt{currentSimulation} y de
+  \texttt{rsrpThreshold}, y se actualiza sin intervención manual.
+\item \textbf{Efectos secundarios controlados}: \texttt{effect()} ejecuta una función
+  cada vez que los \textit{signals} leídos dentro de ella cambian. Lo usamos en
+  \texttt{MapComponent} para reconstruir el \textit{heatmap} cuando cambian los
+  datos filtrados.
+\end{enumerate}
+
+El modelo de datos del frontend se define en \texttt{simulation.model.ts} mediante
+interfaces TypeScript: \texttt{Simulation}, \texttt{CoveragePoint},
+\texttt{SimulationMetadata} y \texttt{SimulationStats}. La función
+\texttt{apiToSimulation()} se encarga de mapear el formato del backend (con campos
+\texttt{lat}, \texttt{lng}, \texttt{rsrp}) al formato interno (con campos
+\texttt{latitude}, \texttt{longitude}, \texttt{rsrp\_dbm}), desacoplando así el
+modelo de la API del modelo de la vista.
+
+\section{Integración del sistema}
+\label{sec:impl_integracion}
+
+Las tres capas descritas en las secciones anteriores forman un \textit{pipeline}
+lineal de datos que no requiere base de datos ni colas de mensajes: la simulación
+genera ficheros, el backend los sirve y el frontend los renderiza. Esta sencillez
+es deliberada y responde a los requisitos del escenario táctico, donde el sistema
+debe poder desplegarse en un portátil de campo sin infraestructura adicional.
+
+\subsection{Flujo de datos extremo a extremo}
+\label{sec:integracion_flujo}
+
+El flujo completo consta de cuatro etapas:
+
+\begin{enumerate}
+\item \textbf{Simulación}: el operador ejecuta \texttt{simulacion\_cobertura\_5g.m}
+  en MATLAB con los parámetros deseados (frecuencia, potencia, emplazamiento). El
+  bloque 7 invoca \texttt{exportar\_json.m}, que genera un fichero
+  \texttt{<uuid>.json} en \texttt{matlab/output/}.
+\item \textbf{Servicio}: Spring Boot, configurado con
+  \texttt{simulations.data-dir=../matlab/output}, detecta los ficheros JSON del
+  directorio y los expone en la API REST sin necesidad de reiniciar ni recargar.
+\item \textbf{Presentación}: la aplicación Angular solicita el listado de
+  simulaciones al arrancar (\texttt{GET /api/simulations}), presenta el selector
+  en el \textit{sidebar} y, cuando el usuario elige una, solicita el JSON completo
+  (\texttt{GET /api/simulations/\{uuid\}}).
+\item \textbf{Visualización}: con los \texttt{coveragePoints} recibidos, el
+  \texttt{MapComponent} construye el \textit{heatmap} sobre Leaflet y lo muestra
+  en pantalla.
+\end{enumerate}
+
+Este diseño desacoplado permite que cada capa evolucione de forma independiente.
+Basta con respetar el contrato JSON para que un cambio en el modelo de propagación
+de MATLAB no afecte ni al backend ni al frontend.
+
+\subsection{Formato de intercambio JSON}
+\label{sec:integracion_json}
+
+El fichero JSON constituye el contrato de interfaz entre MATLAB y Spring Boot.
+Su esquema, definido implícitamente por \texttt{exportar\_json.m} y consumido por
+\texttt{SimulationService} vía Jackson, contiene cinco campos raíz:
+
+\begin{table}[H]
+\centering
+\caption{Esquema del fichero JSON de simulación.}
+\label{tab:json_schema}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
+\hline
+\texttt{id}             & \texttt{string}  & UUID~v4 generado por la JVM de MATLAB \\
+\texttt{name}           & \texttt{string}  & Nombre descriptivo del escenario \\
+\texttt{createdAt}      & \texttt{string}  & Marca temporal ISO~8601 (UTC) \\
+\texttt{metadata}       & \texttt{object}  & Parámetros normalizados (frecuencia, modelo, etc.) \\
+\texttt{parameters}     & \texttt{object}  & Copia de la estructura \texttt{params} de MATLAB \\
+\texttt{coveragePoints} & \texttt{array}   & Array de \texttt{\{lat, lng, rsrp\}} \\
+\hline
+\end{tabular}
+\end{table}
+
+El campo \texttt{metadata} expone los parámetros en claves normalizadas en inglés
+(\texttt{frequency\_ghz}, \texttt{tx\_power\_dbm}, \texttt{antenna\_height\_m},
+\texttt{tx\_location}, \texttt{model}, \texttt{terrain\_data}) para que el frontend
+pueda consumirlos directamente sin conocer la nomenclatura interna de MATLAB. El campo
+\texttt{parameters} conserva los nombres originales de la estructura MATLAB por
+compatibilidad con análisis posteriores.
+
+En el lado del backend, la deserialización la realiza Jackson a través de
+\texttt{ObjectMapper.readTree()}, que construye un árbol \texttt{JsonNode} genérico.
+Para el listado, \texttt{parseSummary} extrae solo \texttt{id}, \texttt{name},
+\texttt{createdAt} y \texttt{metadata} del nodo raíz, evitando cargar en memoria el
+array \texttt{coveragePoints} que puede contener miles de elementos.
+
+En el lado del frontend, la función \texttt{apiToSimulation()} (definida en
+\texttt{simulation.model.ts}) mapea los campos del JSON a la interfaz
+\texttt{Simulation}, renombrando \texttt{lat}/\texttt{lng}/\texttt{rsrp} a
+\texttt{latitude}/\texttt{longitude}/\texttt{rsrp\_dbm} para mantener la coherencia
+con el modelo interno de la aplicación.
+
+\subsection{Configuración del entorno de desarrollo}
+\label{sec:integracion_entorno}
+
+Para ejecutar el sistema completo en un entorno de desarrollo local se necesitan los
+siguientes prerrequisitos:
+
+\begin{table}[H]
+\centering
+\caption{Prerrequisitos del entorno de desarrollo.}
+\label{tab:prereqs}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Herramienta} & \textbf{Versión mínima} & \textbf{Propósito} \\
+\hline
+MATLAB          & R2025b  & Simulación radioeléctrica \\
+Java JDK        & 17      & Compilación y ejecución del backend \\
+Apache Maven    & 3.9+    & Gestión de dependencias del backend \\
+Node.js         & 18 LTS  & Entorno de ejecución del frontend \\
+Angular CLI     & 17+     & Compilación y servidor de desarrollo \\
+\hline
+\end{tabular}
+\end{table}
+
+El orden de arranque recomendado es:
+
+\begin{enumerate}
+\item Ejecutar la simulación en MATLAB para generar al menos un fichero JSON en
+  \texttt{matlab/output/}.
+\item Arrancar el backend desde la carpeta \texttt{backend/} con
+  \texttt{mvn spring-boot:run}. El servidor queda disponible en
+  \texttt{http://localhost:8080}.
+\item Arrancar el frontend desde
+  \texttt{mockups/mockup\_v1/gemelo-digital-5g/} con \texttt{ng serve}. La
+  aplicación queda disponible en \texttt{http://localhost:4200}.
+\end{enumerate}
+
+La configuración CORS del backend (sección~\ref{sec:backend_config}) permite que el
+frontend en el puerto 4200 realice peticiones al backend en el puerto 8080 sin que
+el navegador las bloquee. En un despliegue unificado (por ejemplo, sirviendo los
+\textit{assets} estáticos de Angular desde el propio Spring Boot), esta configuración
+dejaría de ser necesaria.
+
+\subsection{Despliegue}
+\label{sec:integracion_despliegue}
+
+El backend se empaqueta como un JAR ejecutable estándar de Spring Boot:
+
+\begin{lstlisting}[caption={Compilación y ejecución del backend.}, label={cod:build}]
+cd backend/
+mvn clean package -DskipTests
+java -jar target/gemelo5g-0.1.0-SNAPSHOT.jar \
+     --simulations.data-dir=/ruta/a/jsons
+\end{lstlisting}
+
+El comando \texttt{mvn package} compila el código, ejecuta los tests (omitidos aquí
+con \texttt{-DskipTests} para acelerar) y produce un JAR con todas las dependencias
+incluidas gracias al \textit{plugin} \texttt{spring-boot-maven-plugin}. La propiedad
+\texttt{simulations.data-dir} se puede sobreescribir por línea de comandos para
+apuntar a cualquier directorio que contenga los JSON de simulación.
+
+Para el frontend, \texttt{ng build} genera los \textit{assets} estáticos en
+\texttt{dist/}, que pueden servirse con cualquier servidor HTTP (Nginx, Apache, o
+el propio Spring Boot copiándolos a \texttt{src/main/resources/static/}).
+
+En el contexto de este TFG, ambos servicios se ejecutan en la misma máquina durante
+el desarrollo y las pruebas. Un despliegue táctico real seguiría el mismo esquema en
+un equipo portátil de campo, donde la latencia de red es irrelevante y la prioridad
+es la autonomía del sistema sin dependencias de conectividad externa.
