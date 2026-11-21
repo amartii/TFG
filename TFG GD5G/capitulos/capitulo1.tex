@@ -5,21 +5,93 @@
 
 \section{Contexto y Motivación}
 \label{sec:contexto}
-\textit{Evolución de redes móviles (4G→5G→6G), necesidad de burbujas tácticas en emergencias, gap entre software comercial caro y herramientas accesibles.}
+
+La evolución de las redes de comunicaciones móviles ha experimentado un desarrollo exponencial en las últimas décadas. Desde la introducción de los sistemas de tercera generación (3G) que permitieron la transmisión de datos a velocidades moderadas, hasta el despliegue masivo de las redes LTE/4G que consolidaron el acceso a Internet móvil de banda ancha, el sector de las telecomunicaciones ha buscado constantemente satisfacer las crecientes demandas de conectividad de la sociedad moderna. La llegada de la quinta generación de redes móviles (5G), estandarizada por el \textit{3rd Generation Partnership Project} (3GPP) a partir de su Release 15~\cite{3gpp_rel15_2018}, representa un salto cualitativo que va más allá del incremento de velocidad de transmisión. La tecnología 5G New Radio (NR) introduce capacidades fundamentales como ultra-baja latencia, soporte masivo de dispositivos IoT y arquitecturas de red flexibles basadas en virtualización, características que abren el camino hacia aplicaciones críticas en sectores como la salud, la industria 4.0, el transporte autónomo y las comunicaciones de emergencia.
+
+En este contexto, emerge el concepto de \textbf{redes 5G tácticas} o \textbf{burbujas de cobertura 5G desplegables}, entendidas como infraestructuras de comunicación autónomas, portátiles y de rápido despliegue que permiten proporcionar conectividad de alta capacidad en escenarios donde la infraestructura fija es inexistente, ha sido destruida o resulta insuficiente. Estas redes tácticas encuentran aplicación en tres ámbitos principales: (i)~operaciones militares y de defensa, donde se requiere establecer comunicaciones seguras y de alta capacidad en zonas de operaciones remotas; (ii)~escenarios de emergencia y catástrofes naturales, como terremotos, inundaciones o incendios forestales, en los que la infraestructura civil queda inoperativa y es necesario coordinar equipos de rescate, telemetría médica y comunicaciones de emergencia; y (iii)~eventos temporales de gran afluencia, como conciertos, competiciones deportivas internacionales o cumbres políticas, donde la demanda de conectividad supera la capacidad de las redes celulares existentes.
+
+La planificación eficiente de estas redes tácticas exige una evaluación previa de la cobertura radioeléctrica esperada, considerando factores como la orografía del terreno, la propagación electromagnética en las bandas de frecuencia 5G FR1 (sub-6 GHz), las características de las antenas y la potencia de transmisión. En este punto, cobra especial relevancia el concepto de \textbf{gemelo digital} (\textit{digital twin}), introducido originalmente por Grieves en el contexto de la gestión del ciclo de vida de productos~\cite{grieves2014digital} y posteriormente extendido a sistemas complejos como redes de telecomunicaciones~\cite{fuller2020digital}. Un gemelo digital es una representación virtual interactiva y actualizable de un sistema físico que permite simular su comportamiento, optimizar su configuración y predecir su rendimiento antes de su despliegue real. Aplicado a la planificación de cobertura 5G, un gemelo digital permitiría a los ingenieros de telecomunicaciones evaluar diferentes configuraciones de estaciones base, validar hipótesis de propagación y estimar áreas de cobertura sin necesidad de realizar costosos ensayos de campo preliminares.
+
+No obstante, la disponibilidad de herramientas de simulación de cobertura radioeléctrica de calidad profesional presenta una barrera económica significativa. Soluciones comerciales consolidadas como Xirio Online~\cite{xirio2024}, con costes de licencia anual que superan los 2.000~\texteuro, o Atoll de Forsk~\cite{atoll}, cuyo coste puede alcanzar los 5.000~\texteuro\ anuales, resultan prohibitivas para organizaciones con presupuestos limitados, equipos de investigación académica o pequeñas empresas de ingeniería. Esta situación genera una brecha entre la necesidad real de herramientas accesibles de planificación de cobertura táctica y la oferta de mercado, dominada por soluciones empresariales de alto coste. El presente trabajo nace de la motivación de explorar alternativas tecnológicas que, aprovechando herramientas de software de uso académico como MATLAB, infraestructuras de desarrollo web modernas y datos topográficos de dominio público, permitan desarrollar un prototipo funcional de gemelo digital para redes 5G tácticas que sea accesible, modificable y extensible.
 
 \section{Descripción del Problema}
 \label{sec:problema}
-\textit{Planificación de cobertura 5G requiere simulación RF costosa, ingenieros necesitan validación preliminar rápida sin licencias de Xirio/Atoll.}
+
+La planificación de la cobertura radioeléctrica en redes móviles 5G constituye una tarea de ingeniería compleja que requiere modelar la propagación de ondas electromagnéticas en entornos tridimensionales realistas. A diferencia de estimaciones simplificadas basadas en modelos de espacio libre o fórmulas empíricas generales, la predicción precisa de cobertura debe considerar fenómenos físicos como la difracción por obstáculos montañosos, la reflexión en edificaciones, la atenuación por vegetación y las condiciones de propagación específicas de cada banda de frecuencia. Para redes tácticas desplegadas en terrenos variables (zonas rurales montañosas, áreas periurbanas, valles fluviales), es imprescindible integrar modelos de propagación deterministas o semi-empíricos validados, como el modelo de Longley-Rice (Irregular Terrain Model, ITM)~\cite{longley1968transmission}, junto con datos topográficos de alta resolución, tales como los proporcionados por la misión SRTM (\textit{Shuttle Radar Topography Mission})~\cite{srtm_farr_2007}, que ofrece modelos digitales de elevación con resolución espacial de 30~metros para la mayor parte del planeta.
+
+El problema que motiva este Trabajo de Fin de Grado radica en la necesidad de proporcionar a ingenieros de telecomunicaciones, planificadores de emergencias y equipos de investigación una herramienta de validación preliminar de cobertura 5G que sea técnicamente rigurosa pero económicamente accesible. Las soluciones comerciales existentes, si bien altamente precisas y con interfaces profesionales, imponen barreras de entrada en forma de licencias anuales costosas y requisitos de formación específica. Por otro lado, las herramientas de código abierto disponibles suelen carecer de interfaces de usuario intuitivas, documentación completa o integración con tecnologías web modernas, limitando su adopción en entornos operativos reales.
+
+Se identifica, por tanto, la oportunidad de desarrollar un \textbf{prototipo de concepto} (\textit{proof-of-concept}, PoC) que combine la capacidad de cálculo de modelos de propagación en entorno MATLAB, una arquitectura de servicios web RESTful que garantice la interoperabilidad, y una interfaz de usuario web moderna que permita la visualización geoespacial interactiva de mapas de cobertura. Este prototipo debe ser capaz de recibir como entrada los parámetros de configuración de una estación base 5G (posición geográfica, altura de antena, potencia de transmisión, frecuencia de operación en bandas FR1), procesar la simulación de propagación sobre el terreno real, y generar como salida un mapa de calor georreferenciado que represente la intensidad de señal recibida (RSRP, \textit{Reference Signal Received Power}) en el área de interés. El desarrollo de este prototipo no solo aborda una necesidad técnica, sino que también constituye un ejercicio académico completo que integra conocimientos de teoría de propagación radioeléctrica, desarrollo de software backend y frontend, integración de sistemas heterogéneos y validación de resultados mediante escenarios de referencia.
 
 \section{Objetivos del Trabajo}
 \label{sec:objetivos}
-\textit{Objetivo general: desarrollar PoC de gemelo digital web para cobertura 5G FR1.
-5 objetivos específicos: modelado MATLAB, interoperabilidad JSON, backend Spring Boot, frontend Angular, validación real.}
+
+El objetivo general del presente Trabajo de Fin de Grado es el siguiente:
+
+\begin{quote}
+\textit{Diseñar e implementar un prototipo de concepto (PoC) de gemelo digital basado en tecnologías web para la planificación y visualización de cobertura radioeléctrica de redes 5G tácticas en la banda FR1 (sub-6~GHz), integrando modelos de propagación deterministas sobre datos topográficos reales.}
+\end{quote}
+
+Para alcanzar este objetivo general, se establecen los siguientes \textbf{objetivos específicos}:
+
+\begin{enumerate}
+    \item[\textbf{OE1.}] \textbf{Modelado de propagación radioeléctrica en MATLAB:} Implementar un módulo de cálculo de cobertura 5G en entorno MATLAB que integre el modelo de propagación de Longley-Rice (Irregular Terrain Model) con datos topográficos de la misión SRTM de resolución 30~m. El módulo debe aceptar parámetros de configuración de estación base (latitud, longitud, altura de antena, potencia EIRP, frecuencia) y generar matrices de intensidad de señal recibida (RSRP) georreferenciadas.
+    
+    \item[\textbf{OE2.}] \textbf{Interoperabilidad mediante formato JSON con identificadores UUID:} Diseñar un esquema de intercambio de datos basado en JSON que permita la serialización de simulaciones de cobertura con identificadores únicos universales (UUID versión 4). Este mecanismo debe garantizar la trazabilidad de cada simulación y facilitar la integración entre el motor de cálculo MATLAB y los servicios web posteriores.
+    
+    \item[\textbf{OE3.}] \textbf{Desarrollo de backend REST con Spring Boot:} Implementar un servidor de aplicaciones basado en el framework Spring Boot 3.x (Java 17) que exponga una API RESTful para la gestión de simulaciones de cobertura. El backend debe incluir documentación automática de la API mediante OpenAPI/Swagger, pruebas unitarias y de integración con JUnit 5, y mecanismos de validación de parámetros de entrada.
+    
+    \item[\textbf{OE4.}] \textbf{Desarrollo de frontend web con Angular y visualización geoespacial:} Crear una aplicación web de página única (SPA) con Angular 21 que consuma la API REST y presente al usuario una interfaz intuitiva para configurar simulaciones y visualizar los resultados. La visualización de cobertura debe implementarse mediante la biblioteca Leaflet, utilizando capas de mapa de calor (\textit{heatmap}) georreferenciadas sobre cartografía base de OpenStreetMap.
+    
+    \item[\textbf{OE5.}] \textbf{Validación del sistema mediante escenarios de referencia:} Diseñar y ejecutar casos de prueba que validen la coherencia de los resultados de simulación frente a límites teóricos conocidos (ecuación de Friis en espacio libre, máxima distancia alcanzable en función del balance de enlace) y, si es posible, contrastar los resultados con datos publicados en literatura técnica o mediciones reales documentadas.
+\end{enumerate}
+
+Estos objetivos específicos definen el alcance técnico del trabajo y establecen criterios verificables de consecución que guiarán el desarrollo del prototipo.
 
 \section{Metodología y Planificación}
 \label{sec:metodologia}
-\textit{Metodología, fases del proyecto, tecnologías seleccionadas (MATLAB, Java, TypeScript).}
+
+El desarrollo del presente proyecto se aborda mediante una \textbf{metodología iterativa e incremental}, en la que cada componente del sistema (motor de simulación MATLAB, backend Spring Boot, frontend Angular) se desarrolla, prueba e integra de forma progresiva. Este enfoque permite validar continuamente la viabilidad técnica de cada subsistema antes de proceder a la integración final, reduciendo el riesgo de incompatibilidades arquitectónicas y facilitando la detección temprana de errores de diseño.
+
+El proyecto se estructura en las siguientes \textbf{fases de trabajo}:
+
+\begin{enumerate}
+    \item \textbf{Análisis de requisitos y diseño preliminar:} Estudio de los modelos de propagación aplicables a redes 5G tácticas, selección de herramientas de software, definición de la arquitectura del sistema y especificación de los interfaces de comunicación entre componentes.
+    
+    \item \textbf{Implementación del motor de simulación MATLAB:} Desarrollo del módulo de cálculo de cobertura, adquisición e integración de datos topográficos SRTM, validación de resultados preliminares frente a casos teóricos conocidos y generación de archivos JSON de salida.
+    
+    \item \textbf{Desarrollo del backend Spring Boot:} Implementación de los servicios REST para gestión de simulaciones, definición de modelos de datos (DTOs, entidades), configuración de documentación automática con OpenAPI, y escritura de pruebas unitarias y de integración.
+    
+    \item \textbf{Desarrollo del frontend Angular:} Creación de la interfaz de usuario web, implementación de formularios de configuración reactivos, integración con la API REST mediante servicios HTTP, y desarrollo de la capa de visualización geoespacial con Leaflet.
+    
+    \item \textbf{Integración y validación del sistema completo:} Pruebas end-to-end del flujo completo de simulación, validación de resultados con escenarios de referencia, análisis de coherencia de cobertura, y documentación de limitaciones y trabajos futuros.
+\end{enumerate}
+
+El conjunto de \textbf{tecnologías seleccionadas} para el desarrollo del prototipo incluye:
+
+\begin{itemize}
+    \item \textbf{MATLAB R2025b:} Entorno de cálculo técnico para el modelado de propagación radioeléctrica, con acceso a las toolboxes de Antenna y RF Propagation.
+    \item \textbf{Java 17 y Spring Boot 3.2:} Framework de desarrollo backend para la implementación de servicios REST robustos, con soporte para inyección de dependencias, programación orientada a aspectos y configuración declarativa.
+    \item \textbf{Angular 21 y TypeScript:} Framework de desarrollo frontend para aplicaciones web de página única, con arquitectura basada en componentes, sistema de inyección de dependencias y enlace de datos bidireccional.
+    \item \textbf{Leaflet 1.9:} Biblioteca JavaScript de código abierto para visualización de mapas interactivos, ligera y extensible mediante plugins.
+    \item \textbf{Git y GitHub:} Sistema de control de versiones distribuido para la gestión del código fuente y la colaboración.
+\end{itemize}
+
+La combinación de estas tecnologías permite desarrollar un prototipo modular, escalable y con potencial de extensión hacia funcionalidades avanzadas en trabajos futuros.
 
 \section{Estructura del Documento}
 \label{sec:estructura}
-\textit{Resumen de capítulos 2-6 y anexos.}
+
+El presente documento se organiza en seis capítulos principales y un conjunto de anexos técnicos que documentan aspectos complementarios del desarrollo. La estructura es la siguiente:
+
+El \textbf{Capítulo~\ref{cap:capitulo2}} presenta el \textbf{Estado del Arte}, donde se revisa el contexto tecnológico de las redes 5G New Radio, el concepto de gemelo digital aplicado a telecomunicaciones, los modelos de propagación radioeléctrica existentes (con especial énfasis en el modelo de Longley-Rice), las fuentes de datos topográficos disponibles (SRTM, ASTER GDEM), y un análisis comparativo de herramientas comerciales y de código abierto para la planificación de cobertura.
+
+El \textbf{Capítulo~\ref{cap:capitulo3}} describe el \textbf{Análisis y Diseño del Sistema}, detallando los requisitos funcionales y no funcionales del prototipo, la arquitectura general del sistema (modelo cliente-servidor de tres capas: MATLAB, Spring Boot, Angular), el diseño de los interfaces de comunicación (esquema JSON, API REST), y los diagramas de componentes y de secuencia que ilustran el flujo de interacción entre módulos.
+
+El \textbf{Capítulo~\ref{cap:capitulo4}} aborda la \textbf{Implementación del Prototipo}, presentando los detalles técnicos de cada componente: la implementación del motor de simulación MATLAB (integración del modelo de Longley-Rice con datos SRTM, generación de matrices de cobertura), el desarrollo del backend Spring Boot (controladores REST, servicios de negocio, repositorios, documentación OpenAPI), y el desarrollo del frontend Angular (componentes de interfaz, servicios HTTP, integración de Leaflet para visualización de heatmaps).
+
+El \textbf{Capítulo~\ref{cap:capitulo5}} expone las \textbf{Pruebas y Validación}, donde se documentan los casos de prueba diseñados para validar el sistema: verificación de límites teóricos (ecuación de Friis, balance de enlace), comparación con resultados de literatura técnica, análisis de coherencia de mapas de cobertura generados, y pruebas de usabilidad de la interfaz web.
+
+El \textbf{Capítulo~\ref{cap:capitulo6}} concluye el trabajo con las \textbf{Conclusiones y Líneas Futuras}, sintetizando los resultados obtenidos, evaluando el grado de cumplimiento de los objetivos específicos, identificando las limitaciones del prototipo actual y proponiendo extensiones futuras, tales como la incorporación de modelos de propagación 3D más avanzados, la integración de datos de cobertura real mediante campañas de medida, o la extensión del prototipo hacia bandas milimétricas 5G FR2.
+
+Los \textbf{anexos} incluyen documentación complementaria como manuales de instalación y configuración del entorno de desarrollo, diagramas de clases completos, especificaciones detalladas de la API REST, y ejemplos de archivos JSON de entrada y salida.

@@ -118,7 +118,7 @@ medias:
 \end{equation}
 
 donde $a = 3$~km. El error que introduce esta aproximación en la zona de Fuenlabrada
-($\phi_0 \approx 40°$) es menor del 0,1~\%, perfectamente asumible para nuestro propósito.
+($\phi_0 \approx 40^\circ$) es menor del 0,1~\%, perfectamente asumible para nuestro propósito.
 
 Con \texttt{linspace} construimos los vectores de coordenadas y con \texttt{meshgrid}
 la cuadrícula 2D. Después aplanamos las matrices \texttt{LATS} y \texttt{LONS} a vectores
@@ -494,7 +494,7 @@ los resume.
 \begin{table}[H]
 \centering
 \caption{Endpoints de la API REST.}
-\label{tab:endpoints}
+\label{tab:impl_endpoints}
 \begin{tabular}{|l|l|l|}
 \hline
 \textbf{Método} & \textbf{URL} & \textbf{Descripción} \\
@@ -658,12 +658,12 @@ así la defensa en profundidad implementada en \texttt{SimulationService}.
 \label{sec:impl_frontend}
 
 La capa de presentación es una aplicación web monopágina (\textit{Single Page
-Application}) construida con Angular~17 y TypeScript~5.9. Su función es consumir la
+Application}) construida con Angular~21 y TypeScript~5.9. Su función es consumir la
 API REST del backend y representar los datos de cobertura como un \textit{heatmap}
 interactivo sobre un mapa geográfico. A diferencia de versiones anteriores de Angular,
 la aplicación utiliza exclusivamente componentes \textit{standalone} (sin
 \texttt{NgModule}) y gestión de estado basada en \textit{signals}, siguiendo las
-prácticas recomendadas a partir de Angular~16.
+prácticas recomendadas en Angular moderno.
 
 \subsection{Arquitectura de componentes}
 \label{sec:frontend_componentes}
@@ -810,6 +810,152 @@ al lugar pulsado mediante distancia euclidiana en grados. Si la distancia es inf
 a 0,003° (aproximadamente 300~m), selecciona el punto y el \texttt{InfoPanelComponent}
 muestra su RSRP, coordenadas y \textit{path loss} estimado. En caso contrario, se
 deselecciona cualquier punto previo.
+
+\subsection{Selector de cartografía y tiles vectoriales locales}
+\label{sec:frontend_tile_themes}
+
+La cartografía base condiciona la legibilidad del \textit{heatmap}: un fondo demasiado
+saturado oculta los gradientes de cobertura, mientras que un fondo neutro los realza.
+Para dar flexibilidad al usuario y, al mismo tiempo, soportar despliegues sin
+conectividad, la aplicación incorpora un \texttt{MapTileService} que centraliza la
+gestión de las capas cartográficas y un mini-selector visual integrado en el mapa.
+
+\subsubsection{Catálogo de cartografías}
+
+El servicio define tres temas raster seleccionables desde la interfaz, todos ellos
+servidos desde CDN públicos sin requerir clave de API:
+
+\begin{table}[h!]
+\centering
+\caption{Cartografías disponibles en el frontend.}
+\label{tab:cartografias}
+\small
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Identificador} & \textbf{Proveedor} & \textbf{Tipo} & \textbf{Uso} \\
+\hline
+\texttt{osm}          & OpenStreetMap                & Raster PNG    & Cartografía estándar \\
+\texttt{satellite}    & ESRI World Imagery           & Raster JPEG   & Vista aérea \\
+\texttt{terrain}      & OpenTopoMap                  & Raster PNG    & Relieve y curvas de nivel \\
+\hline
+\end{tabular}
+\end{table}
+
+La elección persiste en \texttt{localStorage} bajo la clave \texttt{gd5g-map-theme},
+de manera que sobrevive a recargas del navegador. Un \textit{signal} \texttt{current}
+expone el tema activo y los componentes \texttt{MapComponent} y \texttt{ComparisonViewComponent}
+reaccionan automáticamente reemplazando la capa de \textit{tiles} mediante un
+\texttt{effect()} de Angular. Adicionalmente, el servicio incorpora la infraestructura
+necesaria para servir \textit{tiles} vectoriales locales (descrita a continuación);
+esta capacidad se ha dejado preparada como camino de optimización para despliegues
+sin conectividad, aunque por ahora la interfaz solo expone las tres cartografías raster.
+
+\subsubsection{Tiles vectoriales locales con PMTiles}
+
+Las tres primeras cartografías son \textit{tiles} raster servidos desde CDN públicos.
+Esta solución, aunque cómoda, presenta dos limitaciones para el uso táctico al que
+se orienta el TFG: requiere conectividad permanente y la latencia de cada \textit{tile}
+(50--150~ms en redes móviles) se acumula al hacer \textit{pan} o \textit{zoom} sobre
+el mapa, especialmente con cuadrículas de 80×80 puntos. Para mitigarlas, el servicio
+añade dos cartografías vectoriales basadas en el formato \textit{PMTiles}~\cite{protomaps2024}.
+
+\paragraph{El formato PMTiles.}
+PMTiles es un contenedor de \textit{tiles} desarrollado por Protomaps que almacena
+millones de \textit{tiles} en un único fichero binario. El cliente accede a los
+\textit{tiles} mediante peticiones HTTP \emph{range requests} (cabecera
+\texttt{Range: bytes=offset-end}), por lo que no se requiere un servidor de
+\textit{tiles} dedicado: basta con servir el fichero como contenido estático.
+Para España, un PMTiles con la cobertura completa pesa entre 25 y 50~MB
+(extracto del \textit{build} mundial diario de Protomaps), frente a los varios
+gigabytes que ocuparía la misma área en formato raster a múltiples niveles de zoom.
+
+\paragraph{Renderizado vectorial sobre Leaflet.}
+La librería \texttt{protomaps-leaflet} actúa como puente entre el contenedor PMTiles
+y la API de capas de Leaflet. Al instanciar \texttt{leafletLayer(\{ url, theme \})},
+crea una \texttt{L.Layer} estándar que dibuja los \textit{features} vectoriales sobre
+un \texttt{<canvas>} HTML5 y aplica un estilo predefinido (\textit{light} u
+\textit{dark}). Esta integración resulta crítica para el proyecto, porque permite
+incorporar \textit{tiles} vectoriales sin renunciar al \textit{plugin} \texttt{leaflet.heat}
+ni reescribir el resto del componente. El \texttt{MapTileService} discrimina la fuente
+mediante el campo \texttt{kind}:
+
+\begin{lstlisting}[language=JavaScript, caption={Construcción polimórfica de la capa de \textit{tiles}.}, label={cod:tile_layer}]
+createTileLayer(themeId?: string): L.Layer {
+  const theme = MAP_THEMES.find(t => t.id === themeId) ?? this.current();
+
+  if (theme.kind === 'raster') {
+    return L.tileLayer(theme.url, theme.options);
+  }
+
+  // Vector: PMTiles via protomaps-leaflet
+  return protomapsL.leafletLayer({
+    url: this.resolvePmtilesUrl(theme.url),
+    theme: theme.protomapsTheme ?? 'light'
+  });
+}
+\end{lstlisting}
+
+\paragraph{Estrategia de \textit{fallback} y fichero descargado.}
+El servicio aplica una resolución perezosa de la URL: en la primera petición
+verifica con un \texttt{HEAD} la existencia del fichero local
+\texttt{assets/tiles/spain.pmtiles}. Si está disponible, lo usa; si no, recurre al
+CDN público de Protomaps. Para descargar el fichero se proporciona el
+\textit{script} \texttt{mockups/.../scripts/download-pmtiles.ps1}, que ofrece dos
+caminos:
+
+\begin{enumerate}
+\item \textbf{Recomendado, \textit{extract} de la Península Ibérica}: usando la
+  CLI oficial \texttt{pmtiles}~\cite{protomaps2024} se recorta del \textit{build}
+  mundial diario un PMTiles limitado a la \textit{bbox}
+  $[-18{,}5,\ 27{,}5,\ 4{,}4,\ 44{,}0]$ (Iberia + Baleares + Canarias). El fichero
+  resultante pesa entre 25 y 50~MB, suficiente para cubrir todos los escenarios
+  contemplados en el TFG.
+
+\item \textbf{Alternativa sin CLI, demo mundial completo}: el \textit{bucket}
+  público de Protomaps sirve el \textit{build} más reciente del planeta entero
+  en la URL
+  \texttt{https://demo-bucket.protomaps.com/v4.pmtiles}. Este fichero supera
+  \textbf{1~GB} y solo se recomienda cuando se necesita cobertura mundial sin
+  conexión y se dispone de espacio suficiente.
+\end{enumerate}
+
+Una vez colocado el fichero en \texttt{src/assets/tiles/spain.pmtiles}, el frontend
+lo detecta automáticamente y la latencia por \textit{tile} pasa de los 50--150~ms
+de la red al orden de milisegundos de la lectura local.
+
+\paragraph{Comparativa de coste.}
+El Cuadro~\ref{tab:tile_comp} resume la comparativa entre los dos enfoques tras pruebas
+informales sobre los tres escenarios de referencia:
+
+\begin{table}[h!]
+\centering
+\caption{Comparativa entre \textit{tiles} raster remotos y vectoriales locales.}
+\label{tab:tile_comp}
+\small
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Métrica} & \textbf{Raster remoto} & \textbf{Vector local (PMTiles)} \\
+\hline
+Tamaño descargado por sesión & 5--15~MB & 25--50~MB (única vez) \\
+Latencia por \textit{tile}          & 50--150~ms                & $<$~5~ms (lectura local) \\
+Personalización del estilo  & Nula                      & Total (JSON declarativo) \\
+Funciona \textit{offline}   & No                        & Sí \\
+Coste de \textit{bundle} JS         & 0 KB                      & +210~KB (\texttt{pmtiles}+\texttt{protomaps-leaflet}) \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Mini-dashboard de selección}
+
+La interfaz expone los tres temas raster mediante una pequeña tarjeta superpuesta
+en la esquina inferior derecha del mapa, con un botón por cartografía representado
+con un icono SVG distintivo. Al pasar el ratón se muestra el nombre y la descripción
+detallada en un \textit{tooltip}, y el botón activo se resalta con el color de
+acento del tema. En la vista comparativa de simulaciones (\texttt{ComparisonViewComponent})
+cada uno de los dos mapas dispone de su propio selector independiente, lo que permite,
+por ejemplo, contrastar la misma simulación sobre cartografía estándar de
+OpenStreetMap y sobre la vista satélite de ESRI para evaluar la legibilidad del
+\textit{heatmap} en función del fondo.
 
 \subsection{Interfaz de usuario}
 \label{sec:frontend_ui}

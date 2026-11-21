@@ -194,7 +194,7 @@ La documentación interactiva de la API se genera automáticamente mediante
 \subsection{Capa de Presentación: Aplicación Angular}
 \label{subsec:arq_frontend}
 
-La interfaz de usuario está desarrollada con Angular~17+ utilizando componentes
+La interfaz de usuario está desarrollada con Angular~21 utilizando componentes
 \textit{standalone} (sin \lstinline{NgModule}), lo que simplifica la estructura del proyecto
 y mejora el \textit{tree-shaking} del compilador. La aplicación consume la API REST del
 backend y presenta los datos de cobertura como un \textit{heatmap} interactivo renderizado
@@ -537,12 +537,11 @@ ecosistema y disponibilidad de herramientas de desarrollo:
     LTS (\textit{Long-Term Support}), garantiza estabilidad y soporte a largo plazo. Los
     \textit{records} de Java~16+ permiten definir DTOs inmutables de forma concisa.
 
-  \item \textbf{Angular 17+} para el frontend: Angular ofrece tipado estático mediante
+  \item \textbf{Angular 21} para el frontend: Angular ofrece tipado estático mediante
     TypeScript, lo que reduce los errores en tiempo de ejecución y mejora la
-    refactorización del código. Los componentes \textit{standalone} introducidos en
-    Angular~14 y consolidados en Angular~17 simplifican la arquitectura del proyecto. El
-    sistema de \textit{signals} proporciona reactividad eficiente sin dependencias externas
-    de gestión de estado.
+    refactorización del código. Los componentes \textit{standalone} y el sistema de
+    \textit{signals} simplifican la arquitectura del proyecto y proporcionan reactividad
+    eficiente sin dependencias externas de gestión de estado.
 
   \item \textbf{Leaflet + leaflet.heat} para la visualización cartográfica: Leaflet es la
     biblioteca de mapas web de código abierto más ligera y extendida, con un tamaño de

@@ -2,4 +2,32 @@
 
 \chapter*{Abstract\markboth{Abstract}{Abstract}}
 
-\textit{Versión en inglés del resumen para publicaciones internacionales.}
+Radio coverage planning for tactical 5G networks ---deployed in emergency scenarios,
+military operations or temporary events--- requires simulation tools capable of accurately
+modelling electromagnetic propagation over real terrain. Existing commercial solutions
+(Xirio Online, Atoll) impose annual licence costs exceeding \texteuro2,000, restricting
+access for budget-constrained organisations and academic environments.
+
+This Final Degree Project designs and implements a proof-of-concept web-based digital twin
+for coverage visualisation of 5G networks operating in the FR1 band (sub-6\,GHz). The
+system integrates three components in a three-tier architecture: (i)~a MATLAB simulation
+engine applying the Longley-Rice Irregular Terrain Model (ITM) propagation model over
+30\,m resolution SRTM topographic data; (ii)~a REST backend built with Spring Boot~3.2
+(Java~17) that serves simulation results through an OpenAPI-documented API; and (iii)~a
+single-page web application in Angular~21 that renders interactive coverage heatmaps on
+Leaflet-based cartography.
+
+Three reference scenarios have been defined ---suburban (URJC campus, 3.5\,GHz), rural
+mountainous (Sierra de Guadarrama, 700\,MHz) and dense urban (central Madrid,
+3.5\,GHz)--- to validate model coherence against free-space theoretical bounds. The
+prototype includes visual simulation comparison features, dynamic RSRP filtering and base
+map selection. The backend incorporates 13 unit tests, path traversal security validation
+and GZIP compression.
+
+The outcome is an accessible, extensible and open-source tool that enables
+telecommunications engineers to perform preliminary 5G coverage assessments without
+reliance on commercial licences.
+
+\vspace{1em}
+\textbf{Keywords:} digital twin, 5G NR, radio coverage, Longley-Rice, SRTM, Spring Boot,
+Angular, Leaflet, RSRP, tactical networks.

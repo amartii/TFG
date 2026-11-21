@@ -1,19 +1,337 @@
 % !TEX root = ../memoria.tex
+
 \chapter{Anexo A: Manual de Usuario}
 \label{anx:manual_usuario}
-\textit{Uso interfaz web, interpretación resultados.}
+
+Este anexo describe cómo utilizar la aplicación web del gemelo digital una vez
+desplegada en local (véase Anexo~\ref{anx:manual_instalacion} para la instalación).
+Se asume que el backend está escuchando en \texttt{http://localhost:8080} y el
+frontend en \texttt{http://localhost:4200}.
+
+\section{Pantalla principal}
+\label{sec:manual_pantalla}
+
+Al abrir la aplicación se carga automáticamente la primera simulación disponible
+en el directorio \texttt{matlab/output/}. La pantalla se compone de tres áreas:
+
+\begin{enumerate}
+\item \textbf{Cabecera}: muestra el título del proyecto y el botón de cambio de
+  tema claro/oscuro de la interfaz.
+\item \textbf{Barra lateral izquierda} (\textit{sidebar}): contiene los controles
+  principales --- selector de simulación, botón de comparación, parámetros y
+  filtro RSRP.
+\item \textbf{Mapa principal}: ocupa el resto de la ventana y representa el
+  \textit{heatmap} de cobertura sobre la cartografía elegida.
+\end{enumerate}
+
+\section{Selección de la simulación activa}
+\label{sec:manual_simulacion}
+
+En la sección ``Simulación Activa'' del \textit{sidebar} hay un menú desplegable
+con todos los escenarios disponibles. Al elegir uno, el frontend llama al
+\textit{endpoint} \texttt{GET /api/simulations/\{id\}}, recibe los puntos de
+cobertura y reconstruye el \textit{heatmap}. El mapa se centra automáticamente
+en la antena transmisora (TX) del nuevo escenario.
+
+\section{Filtro RSRP}
+\label{sec:manual_rsrp}
+
+El \textit{slider} ``Umbral RSRP mínimo'' filtra en tiempo real los puntos de
+cobertura que se muestran en el \textit{heatmap}. Su rango va de $-140$~dBm
+(muestra todos los puntos) a $-40$~dBm (solo zonas de excelente cobertura). El
+contador situado bajo el \textit{slider} indica cuántos puntos pasan el filtro
+de un total. Esta herramienta permite visualizar de un vistazo la huella de
+cobertura efectiva por encima de un umbral operativo.
+
+\section{Inspección puntual}
+\label{sec:manual_inspeccion}
+
+Al hacer clic sobre el mapa, el frontend busca el punto de cobertura más cercano
+al lugar pulsado. Si la distancia es inferior a aproximadamente 300~m, el
+\texttt{InfoPanelComponent} se despliega mostrando: el valor de RSRP en dBm, una
+escala visual de barras (1 a 4 barras según calidad), las coordenadas geográficas
+con seis decimales, los umbrales 3GPP correspondientes a la categoría y una
+estimación del \textit{path loss} ($PL \approx \text{EIRP} - \text{RSRP}$).
+
+\section{Comparación de simulaciones}
+\label{sec:manual_comparacion}
+
+El botón ``Comparar simulaciones'' del \textit{sidebar} divide la pantalla en
+dos paneles --- A (a la izquierda) y B (a la derecha) --- separados por un
+\textit{dashboard} central con métricas. La selección de la simulación A es la
+que estuviese activa antes de pulsar el botón; la simulación B se elige en el
+desplegable que aparece bajo el botón.
+
+El \textit{dashboard} central muestra:
+\begin{itemize}
+\item Diferencia media $\Delta\overline{\text{RSRP}} = \overline{\text{A}} - \overline{\text{B}}$.
+\item Cuando los dos escenarios solapan espacialmente, un desglose de zonas
+  donde A es mejor, B es mejor o son similares ($|\Delta| \leq 2$~dB).
+\item Distribución comparada de la calidad de cobertura por categorías.
+\item Tabla de parámetros confrontados (frecuencia, potencia, altura, modelo).
+\end{itemize}
+
+Cada uno de los dos mapas dispone de su propio selector de cartografía, lo que
+permite contrastar la misma cobertura con fondos distintos. El botón
+``Cerrar'' devuelve a la vista única.
+
+\section{Selector de cartografía}
+\label{sec:manual_cartografia}
+
+La tarjeta ``Tema'' en la esquina inferior derecha del mapa expone tres
+cartografías base: estándar de OpenStreetMap, satélite de ESRI World Imagery y
+relieve de OpenTopoMap. La elección persiste entre sesiones gracias al
+almacenamiento local del navegador.
+
+\section{Interpretación del \textit{heatmap}}
+\label{sec:manual_interpretacion}
+
+El gradiente cromático del \textit{heatmap} sigue la clasificación de calidad de
+señal RSRP descrita en el Cuadro~\ref{tab:rsrp_umbrales} (capítulo~\ref{cap:capitulo4}):
+rojo para zonas con señal débil ($< -100$~dBm), naranja para aceptable
+($-100$ a $-85$~dBm), amarillo para buena ($-85$ a $-70$~dBm) y verde para
+excelente ($> -70$~dBm). El icono de antena marca la posición exacta del
+transmisor.
 
 \chapter{Anexo B: Manual de Instalación}
 \label{anx:manual_instalacion}
-\textit{Setup MATLAB, JDK, Node.js, IDEs, scripts build.}
+
+\section{Prerrequisitos}
+
+El sistema se ha desarrollado y probado en Windows~11 con las versiones recogidas
+en el Cuadro~\ref{tab:prereqs} del capítulo~\ref{cap:capitulo4}. A modo de
+recordatorio, los componentes mínimos necesarios son:
+
+\begin{itemize}
+\item \textbf{MATLAB R2025b} (probado con Update~4) con los \textit{toolboxes}
+  \textit{Communications}, \textit{Mapping} y \textit{Antenna}. Sin
+  \textit{Communications Toolbox} el motor cae en COST-231 con advertencia.
+\item \textbf{Java JDK 17} y \textbf{Apache Maven} 3.9 o superior.
+\item \textbf{Node.js} 18 LTS o superior y \textbf{Angular CLI} 21.
+\item \textbf{Git} con configuración de cuenta en GitHub.
+\item Conexión a Internet para la primera ejecución de \texttt{npm install} y
+  \texttt{mvn} (descargan dependencias).
+\end{itemize}
+
+\section{Clonado del repositorio}
+
+\begin{lstlisting}[language=bash, caption={Clonado del repositorio.}]
+git clone https://github.com/amartii/TFG.git
+cd TFG
+\end{lstlisting}
+
+\section{Datos de elevación SRTM}
+
+El motor MATLAB necesita el \textit{tile} SRTM \texttt{N40W004} (cubre Madrid,
+Sierra de Guadarrama y Fuenlabrada). Se descarga desde USGS EarthExplorer
+siguiendo las instrucciones de \texttt{matlab/data/DESCARGAR\_SRTM.md} y se
+guarda como \texttt{matlab/data/srtm\_fuenlabrada.tif}. Si el fichero no está
+presente, los \textit{scripts} caen en terreno plano con \textit{warning}.
+
+\section{Generación de simulaciones}
+
+Se abre MATLAB en la carpeta \texttt{matlab/} y se ejecuta el \textit{script}
+\texttt{generar\_escenarios}. El \textit{script} limpia la carpeta de salida y
+genera tres ficheros JSON (URJC suburbano, Sierra rural y Madrid urbano) en
+\texttt{matlab/output/}. Cada fichero contiene metadatos de la simulación y
+hasta varios miles de puntos de cobertura.
+
+\section{Backend Spring Boot}
+
+Desde la raíz del proyecto:
+
+\begin{lstlisting}[language=bash, caption={Arranque del backend.}]
+cd backend
+mvn spring-boot:run
+\end{lstlisting}
+
+Maven descarga las dependencias declaradas en \texttt{pom.xml} (Spring Boot~3.2.4,
+\textit{springdoc-openapi}~2.3.0, Jackson, JUnit~5) y arranca el servidor
+\textit{embedded} en el puerto~8080. Para verificar el correcto funcionamiento se
+puede acceder a \texttt{http://localhost:8080/api/simulations} (lista de
+simulaciones) o a \texttt{http://localhost:8080/swagger-ui.html} (documentación
+interactiva).
+
+\section{Frontend Angular}
+
+En una segunda terminal:
+
+\begin{lstlisting}[language=bash, caption={Arranque del frontend.}]
+cd mockups/mockup_v1/gemelo-digital-5g
+npm install     # solo la primera vez
+ng serve
+\end{lstlisting}
+
+El servidor de desarrollo de Angular escucha en el puerto~4200. Al abrir
+\texttt{http://localhost:4200} en el navegador se carga la aplicación, que llama
+al backend y muestra la primera simulación disponible.
+
+\section{Cartografía vectorial \textit{offline} (opcional)}
+
+Para uso desconectado se proporciona el \textit{script}
+\texttt{scripts/download-pmtiles.ps1}, descrito en el capítulo~\ref{cap:capitulo4},
+que descarga un fichero PMTiles con la cartografía vectorial de la Península
+Ibérica.
 
 \chapter{Anexo C: Código Fuente Destacado}
 \label{anx:codigo}
-\textit{Fragmentos MATLAB, Java, TypeScript comentados.}
+
+Este anexo recoge los fragmentos de código más representativos de cada capa del
+sistema. La finalidad es proporcionar al lector un acceso rápido a la lógica
+clave sin necesidad de navegar por el repositorio. El listado completo está
+disponible en GitHub en el directorio raíz del TFG.
+
+\section{Motor MATLAB --- Bloque 4 (modelo de propagación)}
+
+\begin{lstlisting}[language=matlab, caption={Selección de modelo y cálculo de la pérdida con SRTM.}, label={cod:matlab_block4}]
+% Auto-deteccion de Communications Toolbox
+v_comm = ver('comm');
+tiene_comm_toolbox = ~isempty(v_comm);
+
+if tiene_comm_toolbox
+    % Longley-Rice ITM via Communications Toolbox
+    tx = txsite('Latitude', lat0, 'Longitude', lon0, ...
+        'AntennaHeight', hTx_m, 'TransmitterFrequency', fc_Hz, ...
+        'TransmitterPower', Ptx_W);
+    pm = propagationModel('longley-rice');
+    rx_sites = rxsite('Latitude', lats_flat, 'Longitude', lons_flat, ...
+        'AntennaHeight', hRx_m);
+    Prx_dBm = sigstrength(rx_sites, tx, pm);
+    modelo_usado = 'Longley-Rice';
+else
+    % COST-231 Hata extendido + correccion de altura efectiva
+    elev_tx = geointerp(elev_data, R, lat0, lon0, 'linear');
+    hTx_eff = max(hTx_m + (elev_tx - elev_grid), 5);
+    fc_MHz = fc_Hz / 1e6;
+    a_hRx = (1.1*log10(fc_MHz) - 0.7)*hRx_m - (1.56*log10(fc_MHz) - 0.8);
+    PL_dB = 46.3 + 33.9*log10(fc_MHz) - 13.82*log10(hTx_eff) - a_hRx ...
+          + (44.9 - 6.55*log10(hTx_eff)) .* log10(dist_km) + 3;
+    Prx_dBm = EIRP_dBm + Grx_dBi - PL_dB;
+    modelo_usado = 'COST-231-Hata+SRTM';
+end
+\end{lstlisting}
+
+\section{Backend Java --- validación de UUID y \textit{path traversal}}
+
+\begin{lstlisting}[language=Java, caption={Lectura segura de un fichero JSON por UUID.}, label={cod:backend_service}]
+private static final Pattern UUID_PATTERN = Pattern.compile(
+    "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-" +
+    "[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+
+public JsonNode getById(String id) throws IOException {
+    if (!UUID_PATTERN.matcher(id).matches()) {
+        throw new SimulationNotFoundException(id);
+    }
+    Path file = dataDir.resolve(id + ".json").normalize();
+    if (!file.startsWith(dataDir) || !Files.exists(file)) {
+        throw new SimulationNotFoundException(id);
+    }
+    return cache.computeIfAbsent(id, k -> {
+        try { return mapper.readTree(file.toFile()); }
+        catch (IOException e) { throw new RuntimeException(e); }
+    });
+}
+\end{lstlisting}
+
+\section{Frontend Angular --- gestión de estado con \textit{signals}}
+
+\begin{lstlisting}[language=JavaScript, caption={\texttt{SimulationService} con \textit{signals} y \texttt{computed}.}, label={cod:frontend_signals}]
+private simulations = signal<Simulation[]>([]);
+private selectedId = signal<string | null>(null);
+private rsrpThreshold = signal<number>(-140);
+
+readonly availableSimulations = this.simulations.asReadonly();
+readonly currentThreshold = this.rsrpThreshold.asReadonly();
+
+readonly currentSimulation = computed(() => {
+  const id = this.selectedId();
+  return this.simulations().find(s => s.simulation_id === id) ?? null;
+});
+
+readonly filteredCoveragePoints = computed(() => {
+  const sim = this.currentSimulation();
+  const threshold = this.rsrpThreshold();
+  return sim?.coverage_points.filter(p => p.rsrp_dbm >= threshold) ?? [];
+});
+\end{lstlisting}
+
+\section{Frontend Angular --- renderizado del \textit{heatmap}}
+
+El listado~\ref{cod:heatmap} del capítulo~\ref{cap:capitulo4} muestra el cuerpo
+de la función \texttt{updateHeatmap} que se ejecuta cada vez que cambian los
+puntos filtrados.
 
 \chapter{Anexo D: Especificación API REST}
 \label{anx:api}
-\textit{OpenAPI 3.0, esquemas JSON, ejemplos cURL.}
+
+El backend Spring Boot expone una API REST documentada con OpenAPI~3.0 vía
+\texttt{springdoc-openapi-ui} 2.3.0. La documentación interactiva está disponible
+en tiempo de ejecución en \texttt{http://localhost:8080/swagger-ui.html} y la
+especificación en formato JSON en \texttt{http://localhost:8080/api-docs}.
+
+\section{Endpoints}
+
+La API consta de tres \textit{endpoints} bajo el \textit{path} base
+\texttt{/api/simulations}:
+
+\begin{table}[h!]
+\centering
+\caption{Endpoints expuestos por el backend.}
+\label{tab:api_endpoints}
+\small
+\begin{tabular}{|l|l|p{6.5cm}|}
+\hline
+\textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\
+\hline
+GET & \texttt{/api/simulations}                & Lista resumida de simulaciones disponibles, opcionalmente paginada con \texttt{?page=0\&size=10}. \\
+GET & \texttt{/api/simulations/\{id\}}         & JSON completo de una simulación, incluyendo todos los \texttt{coveragePoints}. \\
+GET & \texttt{/api/simulations/\{id\}/export}  & Descarga el JSON con \texttt{Content-Disposition: attachment} para almacenamiento offline. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Códigos de respuesta}
+
+\begin{itemize}
+\item \texttt{200~OK}: respuesta correcta con cuerpo JSON.
+\item \texttt{400~Bad Request}: parámetro de paginación no numérico.
+\item \texttt{404~Not Found}: UUID no encontrado o fichero inexistente. La
+  respuesta JSON incluye los campos \texttt{timestamp}, \texttt{status},
+  \texttt{error}, \texttt{message} y \texttt{path} producidos por
+  \texttt{GlobalExceptionHandler}.
+\item \texttt{500~Internal Server Error}: errores inesperados de E/S.
+\end{itemize}
+
+\section{Esquema de la simulación}
+
+El cuerpo de la respuesta de \texttt{GET /api/simulations/\{id\}} sigue el
+esquema definido en el capítulo~\ref{cap:capitulo3} (sección de modelo de datos)
+y se estructura en cuatro bloques: \texttt{id} (UUID v4), \texttt{name},
+\texttt{createdAt} (ISO~8601 UTC), \texttt{metadata} (parámetros de la simulación)
+y \texttt{coveragePoints} (lista de \texttt{\{lat, lng, rsrp\}}).
+
+\section{Ejemplos de uso con cURL}
+
+\begin{lstlisting}[language=bash, caption={Listar simulaciones.}]
+curl -X GET http://localhost:8080/api/simulations
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Obtener una simulación concreta (formato pretty con jq).}]
+curl -s http://localhost:8080/api/simulations/a7ab9bad-3251-424e-915b-8ff3c532de9a \
+     | jq '.metadata'
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash, caption={Descargar el JSON como fichero.}]
+curl -OJ http://localhost:8080/api/simulations/<UUID>/export
+\end{lstlisting}
+
+\section{Política CORS}
+
+El servicio configura un filtro CORS en la clase \texttt{CorsConfig} que permite
+peticiones desde \texttt{http://localhost:4200} (servidor de desarrollo de
+Angular) con los métodos GET, POST, PUT, DELETE y OPTIONS. En producción este
+\textit{origin} debe restringirse al dominio definitivo o eliminar el filtro si
+backend y frontend se sirven desde el mismo \textit{host}.
 
 \chapter{Anexo E: Resultados Adicionales}
 \label{anx:resultados}
@@ -21,4 +339,80 @@
 
 \chapter{Anexo F: Diagramas UML}
 \label{anx:uml}
-\textit{Clases, secuencia, componentes, despliegue.}
+
+Este anexo recopila los diagramas UML que ilustran la estructura y el
+comportamiento del sistema. Los diagramas están redactados con notación UML~2.5
+y pueden compilarse a partir de las fuentes situadas en la carpeta
+\texttt{TFG GD5G/figs/uml/} mediante la herramienta PlantUML.
+
+\section{Diagrama de componentes}
+\label{sec:uml_componentes}
+
+El diagrama de componentes refleja la separación en tres capas que se describe
+en los capítulos~\ref{cap:capitulo3} y~\ref{cap:capitulo4}: el motor MATLAB que
+genera ficheros JSON, el backend Spring Boot que sirve esos ficheros mediante
+una API REST y el frontend Angular que consume la API y representa la cobertura.
+Las flechas indican la dirección del flujo de datos.
+
+% \begin{figure}[h!]
+% \centering
+% \includegraphics[width=0.9\textwidth]{figs/uml/componentes.pdf}
+% \caption{Diagrama de componentes del Gemelo Digital 5G.}
+% \label{fig:uml_componentes}
+% \end{figure}
+
+\section{Diagrama de despliegue}
+\label{sec:uml_despliegue}
+
+El despliegue contempla tres nodos lógicos: el \textit{host} de simulación
+(estación de trabajo con MATLAB), el servidor de aplicación (JVM ejecutando el
+\textit{fat-jar} de Spring Boot) y el cliente (navegador con la SPA Angular). En
+el escenario táctico previsto los tres nodos pueden coincidir físicamente en un
+único portátil de campo, sin necesidad de red externa.
+
+% \begin{figure}[h!]
+% \centering
+% \includegraphics[width=0.9\textwidth]{figs/uml/despliegue.pdf}
+% \caption{Diagrama de despliegue mínimo (todo en un portátil).}
+% \label{fig:uml_despliegue}
+% \end{figure}
+
+\section{Diagrama de clases del backend}
+\label{sec:uml_clases}
+
+Las clases principales del paquete \texttt{com.tfg.gemelo5g} son:
+\texttt{SimulationController} (REST), \texttt{SimulationService} (lógica de
+negocio y cache), \texttt{SimulationSummaryDto} (DTO de resumen),
+\texttt{GlobalExceptionHandler} (gestión de errores) y
+\texttt{SimulationNotFoundException}. La relación entre ellas es típica del
+patrón \emph{Controller--Service}: el controlador inyecta el servicio y delega
+la lógica de E/S y validación.
+
+\section{Diagrama de secuencia: carga de una simulación}
+\label{sec:uml_secuencia}
+
+La secuencia de mensajes desde que el usuario selecciona una simulación hasta
+que el \textit{heatmap} se renderiza es la siguiente:
+
+\begin{enumerate}
+\item Usuario selecciona simulación en el \texttt{<select>} del \textit{sidebar}.
+\item \texttt{SidebarComponent} llama a
+  \texttt{simulationService.selectSimulation(id)}.
+\item \texttt{SimulationService} (Angular) emite \texttt{HttpClient.get('/api/simulations/\{id\}')}.
+\item \texttt{SimulationController} (Spring) recibe la petición y delega en
+  \texttt{SimulationService.getById(id)}.
+\item \texttt{SimulationService} (Spring) valida el UUID, comprueba el
+  \textit{path traversal}, consulta la cache y devuelve el \texttt{JsonNode}.
+\item Spring serializa la respuesta como JSON con compresión GZIP.
+\item Angular recibe el JSON, lo mapea a \texttt{Simulation} y actualiza el
+  \textit{signal} \texttt{currentSimulation}.
+\item El \texttt{effect()} de \texttt{MapComponent} se dispara, reconstruye el
+  \textit{heatmap} con \texttt{leaflet.heat} y centra el mapa en la antena TX.
+\end{enumerate}
+
+% \begin{figure}[h!]
+% \centering
+% \includegraphics[width=\textwidth]{figs/uml/secuencia_carga.pdf}
+% \caption{Secuencia de carga de una simulación.}
+% \label{fig:uml_secuencia}
+% \end{figure}

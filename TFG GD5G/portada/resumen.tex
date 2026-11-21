@@ -2,4 +2,36 @@
 
 \chapter*{Resumen\markboth{Resumen}{Resumen}}
 
-\textit{Síntesis ejecutiva del proyecto en español (300 palabras): problema, solución, resultados clave.}
+La planificación de cobertura radioeléctrica en redes 5G tácticas ---desplegadas en
+escenarios de emergencia, operaciones militares o eventos temporales--- requiere
+herramientas de simulación que modelen con precisión la propagación electromagnética
+sobre terreno real. Las soluciones comerciales existentes (Xirio Online, Atoll) imponen
+costes de licencia superiores a 2\,000~\texteuro/año, lo que limita su acceso para
+organismos con presupuestos restringidos y entornos académicos.
+
+El presente Trabajo de Fin de Grado diseña e implementa un prototipo de concepto
+(\textit{proof-of-concept}) de gemelo digital basado en tecnologías web para la
+visualización de cobertura de redes 5G en la banda FR1 (sub-6~GHz). El sistema integra
+tres componentes en una arquitectura de tres capas: (i)~un motor de simulación en MATLAB
+que aplica el modelo de propagación Longley-Rice (Irregular Terrain Model) sobre datos
+topográficos SRTM locales cuando están disponibles y recurre al terreno global del toolbox
+cuando no es posible cargar el tile local; (ii)~un backend REST desarrollado con Spring
+Boot~3.2 (Java~17) que sirve los resultados de simulación mediante una API documentada
+con OpenAPI; y (iii)~una aplicación web de página única en Angular~21 que presenta mapas
+de calor interactivos de cobertura sobre cartografía Leaflet.
+
+Se han definido tres escenarios de referencia ---suburbano (campus URJC, 3,5~GHz),
+rural de montaña (Sierra de Guadarrama, 700~MHz) y urbano denso (centro de Madrid,
+3,5~GHz)--- que permiten validar la coherencia del modelo frente a límites teóricos de
+espacio libre. El prototipo incorpora funcionalidades de comparación visual de
+simulaciones, filtrado dinámico de RSRP y selección de cartografía base. El backend
+incluye 12 pruebas unitarias, validación de seguridad frente a \textit{path traversal}
+y compresión GZIP.
+
+El resultado es una herramienta accesible, extensible y de código abierto que permite a
+ingenieros de telecomunicaciones realizar validaciones preliminares de cobertura 5G sin
+dependencia de licencias comerciales.
+
+\vspace{1em}
+\textbf{Palabras clave:} gemelo digital, 5G NR, cobertura radioeléctrica, Longley-Rice,
+SRTM, Spring Boot, Angular, Leaflet, RSRP, redes tácticas.

@@ -2,39 +2,153 @@
 \chapter{Conclusiones y Trabajo Futuro}
 \label{cap:capitulo6}
 
+Este capítulo final sintetiza los logros alcanzados en el desarrollo del gemelo digital para redes 5G tácticas, evalúa el grado de consecución de los objetivos planteados al inicio del trabajo y reflexiona sobre las competencias adquiridas durante el proceso. Asimismo, se identifican las limitaciones del prototipo desarrollado y se proponen líneas de investigación futuras que permitirían evolucionar el sistema hacia una herramienta operacional de mayor madurez tecnológica.
+
 \section{Conclusiones Generales}
 \label{sec:conclusiones}
-\textit{PoC exitoso demuestra viabilidad de gemelo digital web para 5G táctico con tecnologías modernas gratuitas.\\
-Arquitectura tres capas adecuada para validación preliminar rápida.}
+
+El presente Trabajo de Fin de Grado ha demostrado la viabilidad técnica de construir un gemelo digital web para la planificación de cobertura de redes 5G tácticas mediante tecnologías modernas de código abierto y bajo coste. El prototipo desarrollado integra con éxito tres componentes fundamentales: un módulo de simulación radioeléctrica basado en MATLAB y el modelo de propagación Irregular Terrain Model (ITM) de Longley-Rice~\cite{longley1968transmission}, una capa de servicios REST implementada con Spring Boot, y una interfaz web interactiva desarrollada en Angular 21 que emplea Leaflet para la visualización geoespacial de mapas de calor de cobertura.
+
+Los resultados experimentales obtenidos en tres escenarios representativos ---campus suburbano de la URJC en Fuenlabrada, entorno rural de montaña en la Sierra de Guadarrama, y zona urbana densa en el centro de Madrid--- validan la capacidad del sistema para generar predicciones de RSRP coherentes con los fundamentos teóricos de propagación radioeléctrica. En particular, se ha conseguido una cobertura del 93.4\% de puntos con RSRP $\geq -100$ dBm en el escenario suburbano de referencia (URJC), con un valor medio de potencia recibida de $-93.9$ dBm, cifras que resultan compatibles con los umbrales especificados por 3GPP para servicios de datos 5G FR1~\cite{3gpp_ts38215_2022}.
+
+La arquitectura de tres capas diseñada ---capa de modelado offline (MATLAB), capa de servicios (Spring Boot) y capa de presentación (Angular)--- ha demostrado ser adecuada para la validación preliminar del concepto de gemelo digital aplicado a redes tácticas. La interoperabilidad entre componentes se ha garantizado mediante un formato JSON estandarizado con identificadores únicos UUID v4, lo que permite la trazabilidad completa de cada simulación desde su generación hasta su visualización. El tiempo de carga de los mapas de calor en la interfaz web se ha mantenido por debajo de los 3 segundos en todos los casos de prueba, cumpliendo así el requisito de usabilidad establecido.
+
+Un aspecto destacable del proyecto es la utilización exclusiva de herramientas gratuitas y de código abierto, lo que contrasta favorablemente con soluciones comerciales de planificación radioeléctrica como Xirio Online, cuyo coste de licencia anual supera los 2\,000~€. Esta característica hace que el prototipo desarrollado resulte especialmente apropiado para entornos académicos y para organizaciones con presupuestos limitados que requieran capacidades básicas de planificación de cobertura 5G.
 
 \section{Consecución de Objetivos}
 \label{sec:objetivos_conseguidos}
-\textit{OE1-OE5: todos conseguidos?? (modelado, interoperabilidad, backend, frontend, validación).}
+
+La Tabla~\ref{tab:objetivos_conseguidos} resume el grado de consecución de los cinco objetivos específicos planteados en el Capítulo~\ref{cap:capitulo1}, indicando para cada uno de ellos el estado de cumplimiento y las evidencias principales que lo respaldan.
+
+\begin{table}[htbp]
+\centering
+\caption{Evaluación del grado de consecución de los objetivos específicos del TFG.}
+\label{tab:objetivos_conseguidos}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.2cm}X>{\centering\arraybackslash}p{2.5cm}X}
+\toprule
+\textbf{Obj.} & \textbf{Descripción} & \textbf{Estado} & \textbf{Evidencia principal} \\
+\midrule
+OE1 & Modelar la propagación radioeléctrica de señales 5G FR1 empleando MATLAB y el modelo Longley-Rice ITM con datos topográficos reales & \textcolor{green!60!black}{Conseguido} & Tres escenarios simulados (suburbano, rural, urbano) con datos SRTM locales cuando están disponibles y fallback a terreno global en ausencia del tile local. Validación teórica frente a FSPL documentada en Capítulo~\ref{cap:capitulo5}. \\
+\midrule
+OE2 & Garantizar la interoperabilidad entre MATLAB y la aplicación web mediante un formato JSON estructurado & \textcolor{green!60!black}{Conseguido} & Script \texttt{exportar\_json.m} genera tres ficheros JSON con identificadores UUID v4. Especificación del formato JSON documentada en Capítulo~\ref{cap:capitulo3}. \\
+\midrule
+OE3 & Desarrollar una API REST con Spring Boot para servir los datos de cobertura & \textcolor{green!60!black}{Conseguido} & Backend con 3 endpoints REST, soporte de paginación, 12 tests JUnit con 100\% de éxito, documentación Swagger. Arquitectura descrita en Capítulo~\ref{cap:capitulo3}. \\
+\midrule
+OE4 & Implementar un frontend web interactivo con Angular y visualización geoespacial & \textcolor{green!60!black}{Conseguido} & Aplicación Angular 21 con 8 componentes, gestión de estado basada en señales, mapa de calor Leaflet, vista de comparación split-screen, tres opciones de tiles cartográficos. Interfaz documentada en Capítulo~\ref{cap:capitulo4}. \\
+\midrule
+OE5 & Validar el sistema mediante pruebas funcionales y técnicas & \textcolor{green!60!black}{Conseguido} & Validación teórica del modelo Longley-Rice frente a FSPL, tres escenarios de prueba con métricas RSRP documentadas, verificación del cumplimiento de requisitos funcionales y no funcionales. Resultados en Capítulo~\ref{cap:capitulo5}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Como se observa en la tabla, los cinco objetivos específicos se han alcanzado satisfactoriamente. El objetivo OE1 se ha materializado en la implementación de un pipeline completo de simulación que procesa datos topográficos SRTM locales cuando están disponibles y recurre al terreno global del toolbox en caso de que el tile local no pueda cargarse, aplicando posteriormente el modelo ITM de Longley-Rice para calcular las pérdidas de propagación en cada punto de una malla regular. El objetivo OE2 se ha conseguido mediante el diseño de un esquema JSON que encapsula metadatos de simulación (frecuencia, potencia EIRP, coordenadas del transmisor) junto con las matrices de coordenadas y valores RSRP, garantizando la trazabilidad mediante identificadores UUID únicos.
+
+El cumplimiento del objetivo OE3 queda acreditado por la implementación de un backend Spring Boot~\cite{spring_boot_docs} robusto que expone tres endpoints REST (listado de simulaciones, descarga de JSON completo, y consulta paginada de puntos de cobertura), incorpora validaciones de seguridad frente a path traversal, y alcanza una cobertura de pruebas del 100\% medida mediante 12 casos de test JUnit. Por su parte, el objetivo OE4 se refleja en una aplicación Angular~\cite{angular_docs} moderna que emplea la nueva API de señales para la gestión reactiva del estado, integra Leaflet~\cite{leaflet_docs} para renderizar mapas de calor interactivos, y ofrece una funcionalidad de comparación visual lado a lado de distintas simulaciones.
+
+Finalmente, el objetivo OE5 se ha satisfecho mediante un proceso de validación en dos fases: primero, una validación teórica que demuestra que las predicciones del modelo Longley-Rice se encuentran dentro del rango esperado delimitado por el modelo FSPL en espacio libre; y segundo, una validación empírica basada en la ejecución de tres escenarios representativos que cubren tipologías suburbanas, rurales y urbanas, con análisis estadístico de las distribuciones de RSRP obtenidas.
 
 \section{Competencias Adquiridas}
 \label{sec:competencias}
-\textit{Propagación radioeléctrica, desarrollo fullstack, GIS, gestión proyectos ágil, investigación técnica.}
+
+El desarrollo de este TFG ha permitido la adquisición y consolidación de competencias técnicas transversales de notable relevancia para el perfil profesional de un Ingeniero de Telecomunicaciones. En el ámbito de la \textbf{propagación radioeléctrica y planificación de redes móviles}, se han aplicado conocimientos teóricos sobre modelos de propagación empíricos (Longley-Rice ITM), interpretación de parámetros de calidad de señal (RSRP, RSRQ), y criterios de cobertura según estándares 3GPP. Esta experiencia resulta directamente transferible a tareas de planificación y optimización de redes celulares en entornos profesionales.
+
+En cuanto al \textbf{desarrollo de software full-stack}, el proyecto ha requerido el dominio de tecnologías modernas tanto en el backend (Java, Spring Boot, Maven, JUnit) como en el frontend (TypeScript, Angular 21, RxJS, gestión de estado con señales). La implementación de una arquitectura REST ha reforzado la comprensión de los principios de diseño de APIs, mientras que la integración de librerías geoespaciales (Leaflet) ha proporcionado experiencia en el tratamiento de datos cartográficos y visualización de información espacial.
+
+El componente de \textbf{sistemas de información geográfica (GIS)} ha sido central en el proyecto, abarcando desde la descarga y procesamiento de modelos digitales de elevación (SRTM) hasta la generación de mapas de calor mediante interpolación bilineal. Se han adquirido competencias en la manipulación de sistemas de coordenadas geográficas (WGS84) y en la representación visual de datos espaciales sobre capas cartográficas base de OpenStreetMap y servicios similares.
+
+Desde el punto de vista metodológico, el proyecto ha seguido un enfoque de \textbf{gestión ágil}, con iteraciones cortas de desarrollo, definición de requisitos funcionales y no funcionales, y validación continua mediante pruebas automatizadas. Esta metodología ha permitido adaptar el alcance del prototipo a las restricciones temporales propias de un TFG, priorizando la entrega de un sistema funcional de extremo a extremo sobre la implementación de funcionalidades avanzadas.
+
+Finalmente, la elaboración de esta memoria ha fortalecido competencias de \textbf{investigación técnica y documentación científica}, incluyendo la búsqueda bibliográfica de estándares y publicaciones relevantes, la síntesis de información técnica compleja, y la redacción de documentación técnica estructurada siguiendo convenciones académicas.
 
 \section{Aplicabilidad Práctica}
 \label{sec:aplicabilidad}
-\textit{Emergencias, eventos temporales, zonas remotas, formación universitaria.}
+
+El gemelo digital desarrollado presenta potencial de aplicación en múltiples escenarios operacionales relacionados con redes 5G de despliegue temporal o en entornos con infraestructura limitada. Uno de los casos de uso más evidentes es el \textbf{apoyo a despliegues militares y de emergencias}, donde resulta crítico poder estimar la cobertura radioeléctrica de estaciones base móviles 5G antes de su instalación física. En contextos de gestión de catástrofes naturales (terremotos, incendios forestales, inundaciones) o intervenciones humanitarias en zonas de conflicto, la capacidad de simular rápidamente mapas de cobertura sobre terreno real puede optimizar la ubicación de equipos de telecomunicaciones temporales, maximizando el área servida con recursos limitados.
+
+Un segundo ámbito de aplicabilidad es la \textbf{planificación de eventos temporales de gran afluencia}, como festivales de música, eventos deportivos internacionales, o concentraciones políticas, donde operadores móviles necesitan reforzar la capacidad de red mediante células portátiles (COWs, \textit{Cells on Wheels}). El sistema permitiría evaluar distintas configuraciones de antenas temporales, identificando puntos de cobertura insuficiente antes del evento y evitando así problemas de congestión o falta de señal durante su celebración.
+
+En el contexto de \textbf{planificación de cobertura en zonas rurales o remotas}, el prototipo puede servir como herramienta preliminar para operadores de red con presupuestos limitados que necesiten realizar estudios de viabilidad antes de invertir en costosas campañas de drive-test o herramientas comerciales de planificación. Aunque el modelo Longley-Rice presenta limitaciones en entornos urbanos densos, su precisión en escenarios rurales y suburbanos con línea de vista lo hace apropiado para este caso de uso.
+
+Finalmente, desde una perspectiva académica, el sistema constituye una \textbf{herramienta didáctica para la enseñanza de propagación radioeléctrica} en asignaturas de Ingeniería de Telecomunicaciones. Los estudiantes pueden experimentar con distintas configuraciones de antenas (frecuencia, potencia, altura) y observar de forma visual e interactiva cómo varían los mapas de cobertura en función de la orografía del terreno. La naturaleza open-source del código desarrollado facilita su adaptación y extensión en prácticas de laboratorio o proyectos docentes.
 
 \section{Limitaciones del Trabajo}
 \label{sec:limitaciones_trabajo}
-\textit{Modelo simplificado, simulación offline, sin optimización ubicación, interfaz básica, sin telemetría real.}
+
+A pesar de los resultados satisfactorios obtenidos, el prototipo desarrollado presenta una serie de limitaciones inherentes tanto al modelo de propagación empleado como a las decisiones de diseño arquitectónico adoptadas, que deben tenerse en cuenta a la hora de interpretar sus predicciones y delimitar su ámbito de aplicabilidad.
+
+\subsection*{Limitaciones del Modelo de Propagación}
+
+El modelo Irregular Terrain Model (ITM) de Longley-Rice, aunque ampliamente validado en entornos rurales y suburbanos, presenta \textbf{carencias significativas en escenarios urbanos densos}, donde los efectos de difracción múltiple sobre edificios, reflexiones en fachadas, y canalización de señal por calles (\textit{street canyon effect}) dominan el comportamiento de la propagación. El modelo no considera obstáculos tridimensionales como edificios, lo que provoca predicciones optimistas en entornos urbanos donde la línea de vista se encuentra bloqueada por construcciones.
+
+Asimismo, el sistema no aborda la \textbf{propagación en interiores de edificios}, un aspecto crítico en redes 5G dado que más del 70\% del tráfico de datos se genera en espacios cerrados. Las pérdidas por penetración en muros y ventanas, altamente dependientes del tipo de construcción y materiales empleados, no están modeladas en la implementación actual.
+
+La simulación se ha limitado a un \textbf{escenario de antena única} con patrón de radiación omnidireccional ideal. Despliegues reales de 5G emplean configuraciones MIMO masivo con arrays de antenas que concentran la energía radiada en direcciones específicas mediante beamforming, afectando significativamente a los mapas de cobertura resultantes. El prototipo no soporta actualmente la especificación de patrones de radiación direccionales ni la simulación de múltiples sectores por estación base.
+
+Finalmente, las simulaciones se ejecutan de forma \textbf{offline sobre escenarios estáticos}, sin capacidad para actualizar dinámicamente los mapas de cobertura ante cambios en la configuración de red o en las condiciones de propagación (meteorología, vegetación estacional). Esta limitación impide su uso como gemelo digital en sentido estricto, según la definición de Grieves~\cite{grieves2014digital}, que requiere sincronización continua entre el modelo virtual y el sistema físico.
+
+\subsection*{Limitaciones de Implementación}
+
+Desde el punto de vista arquitectónico, el backend desarrollado \textbf{no incorpora persistencia en base de datos}, limitándose a leer ficheros JSON estáticos del sistema de archivos. Esto impide funcionalidades como el historial de simulaciones, control de versiones de configuraciones, o gestión multiusuario con permisos diferenciados.
+
+La aplicación web carece de \textbf{sistema de autenticación y autorización}, lo que la hace inadecuada para despliegues en entornos de producción donde distintos usuarios (planificadores, operadores de red, responsables tácticos) deban acceder con diferentes niveles de privilegios. Tampoco se ha implementado cifrado de comunicaciones mediante HTTPS, un requisito básico de seguridad para aplicaciones web que manejen datos potencialmente sensibles sobre infraestructuras críticas.
+
+La interfaz de usuario, aunque funcional, presenta \textbf{capacidades limitadas de análisis y parametrización}. No permite al usuario modificar interactivamente los parámetros de simulación (frecuencia, potencia EIRP, altura de antena) y regenerar el mapa de cobertura en tiempo real, obligando a ejecutar nuevas simulaciones en MATLAB de forma manual. Asimismo, carece de herramientas avanzadas de análisis como cálculo de estadísticos por zonas, exportación de informes, o comparación cuantitativa entre simulaciones mediante métricas de similitud.
 
 \section{Líneas de Trabajo Futuro}
 \label{sec:futuro}
-\textit{Mejoras modelo: ray-tracing, obstáculos 3D, multi-frecuencia, indoor.\\
-Arquitectura tiempo real: GPU, WebSocket streaming, cloud distribuido, caché Redis.\\
-Funcionalidades: optimización automática TX (algoritmo genético), multi-antena, análisis interferencia, estimación capacidad.\\
-Integración externa: equipos reales, telemetría vivo, GIS profesional (QGIS).\\
-Usabilidad: PWA offline, app móvil nativa, colaboración multi-usuario.}
+
+Las limitaciones identificadas en la sección anterior abren múltiples vías de evolución del prototipo hacia un sistema de mayor madurez tecnológica y funcionalidad. A continuación se enumeran las principales líneas de trabajo futuro, organizadas en cinco categorías: mejoras del modelo de propagación, arquitectura en tiempo real, nuevas funcionalidades, integración con sistemas externos, y mejoras de usabilidad.
+
+\subsection*{Mejoras del Modelo de Propagación}
+
+La incorporación de técnicas de \textbf{ray-tracing determinista} mediante herramientas como Wireless InSite permitiría modelar con precisión los fenómenos de reflexión, difracción y scattering en entornos urbanos densos. Esta mejora requeriría integrar bases de datos tridimensionales de edificios, disponibles en fuentes como OpenStreetMap o catastros municipales, y supondría un incremento significativo en los tiempos de cómputo que podría mitigarse mediante aceleración por GPU.
+
+La extensión del sistema para simular \textbf{múltiples frecuencias simultáneas} (bandas 700~MHz, 3.5~GHz, 26~GHz) permitiría comparar el comportamiento de distintas asignaciones espectrales 5G FR1 y FR2, especialmente relevante en planificación de cobertura para operadores con licencias multi-banda. Asimismo, la implementación de modelos específicos para \textbf{propagación en interiores} (ITU-R P.1238, COST 231 Multi-Wall) habilitaría estudios de cobertura en edificios singulares como hospitales, estaciones de transporte o centros comerciales.
+
+Finalmente, la incorporación de \textbf{modelos estadísticos de fading rápido} (Rayleigh, Rice, Nakagami) sobre las predicciones de pérdida de propagación media permitiría generar estimaciones probabilísticas de cobertura, más realistas que las predicciones deterministas actuales.
+
+\subsection*{Arquitectura en Tiempo Real}
+
+La migración hacia una arquitectura de \textbf{cómputo en tiempo real} constituye un requisito fundamental para evolucionar el prototipo hacia un verdadero gemelo digital operacional. Esto implicaría reemplazar las simulaciones offline de MATLAB por un motor de cálculo de propagación optimizado en C/C++ con aceleración GPU (CUDA, OpenCL), capaz de regenerar mapas de cobertura en menos de un segundo ante cambios de parámetros.
+
+La implementación de \textbf{comunicación bidireccional mediante WebSocket} entre backend y frontend permitiría streaming progresivo de resultados de simulación, mostrando al usuario la evolución del cálculo en tiempo real mediante actualizaciones incrementales del mapa de calor. Esta mejora resultaría en una experiencia de usuario significativamente más fluida y responsiva.
+
+El despliegue de la solución en \textbf{infraestructura cloud distribuida} (AWS, Azure, Google Cloud) con balanceadores de carga y autoescalado horizontal permitiría atender demandas concurrentes de múltiples usuarios, especialmente relevante en escenarios de uso institucional. La incorporación de una \textbf{capa de caché distribuida} basada en Redis para resultados de simulaciones frecuentes reduciría la latencia de respuesta y la carga computacional en el backend.
+
+\subsection*{Nuevas Funcionalidades}
+
+Una extensión de alto valor operacional sería la implementación de un módulo de \textbf{optimización automática de ubicación de transmisores} mediante algoritmos genéticos o particle swarm optimization. Este sistema tomaría como entrada un área geográfica objetivo y restricciones de cobertura mínima, y devolvería las coordenadas óptimas de emplazamiento de una o varias estaciones base que maximicen el área cubierta minimizando el número de elementos de red desplegados.
+
+La evolución hacia \textbf{simulación multi-antena} con soporte de configuraciones MIMO y patrones de radiación sectoriales permitiría modelar despliegues reales de estaciones base 5G. Esto incluiría la capacidad de especificar diagramas de radiación 3D complejos mediante ficheros MSI Planet o formatos equivalentes, y calcular la cobertura resultante de la suma vectorial de contribuciones de múltiples sectores.
+
+La incorporación de \textbf{análisis de interferencia co-canal y de canal adyacente} entre múltiples transmisores posibilitaría estudios de planificación de frecuencias en despliegues densos, calculando métricas como la relación señal-interferencia (SINR) y su impacto en la capacidad efectiva de cada célula. Complementariamente, un módulo de \textbf{estimación de capacidad de red} basado en la ecuación de Shannon-Hartley permitiría traducir los mapas de RSRP/SINR en estimaciones de throughput disponible por usuario, información crítica para dimensionamiento de redes.
+
+\subsection*{Integración con Sistemas Externos}
+
+La integración del gemelo digital con \textbf{telemetría en tiempo real de equipos reales} constituiría el paso definitivo hacia un digital twin operacional en el sentido de Fuller et al.~\cite{fuller2020digital}. Esto implicaría la conexión mediante APIs o interfaces MIB/SNMP con estaciones base 5G desplegadas en campo, recopilando métricas de carga, interferencia, y handovers que realimentarían el modelo de simulación para ajustar sus predicciones a las observaciones reales.
+
+La interoperabilidad con \textbf{sistemas GIS profesionales} como QGIS mediante exportación a formatos GeoJSON o GeoTIFF facilitaría el análisis avanzado de resultados y su integración en flujos de trabajo cartográficos existentes en organizaciones que ya empleen estas herramientas. Asimismo, la incorporación de estándares \textbf{3GPP de network slicing} permitiría simular la coexistencia de múltiples slices lógicas sobre la misma infraestructura física, cada una con requisitos de cobertura y calidad de servicio diferenciados.
+
+\subsection*{Mejoras de Usabilidad}
+
+Desde el punto de vista de la experiencia de usuario, la conversión de la aplicación web en una \textbf{Progressive Web App (PWA)} con capacidad de funcionamiento offline permitiría su uso en escenarios tácticos con conectividad limitada, donde los mapas de cobertura y datos topográficos podrían precargarse y consultarse sin acceso a Internet.
+
+El desarrollo de una \textbf{aplicación móvil nativa} para Android/iOS habilitaría el uso del sistema directamente en campo durante campañas de medida, permitiendo comparar en tiempo real las predicciones del gemelo digital con mediciones de drive-test capturadas mediante el GPS y el módem 5G del smartphone.
+
+Finalmente, la implementación de funcionalidades de \textbf{colaboración multiusuario} con compartición de simulaciones, comentarios, y control de versiones transformaría el sistema en una plataforma de trabajo colaborativo para equipos de planificación de redes, donde distintos ingenieros podrían proponer y comparar configuraciones alternativas de despliegue de forma coordinada.
 
 \section{Impacto y Difusión}
 \label{sec:impacto}
-\textit{Publicación IEEE, repositorio GitHub open-source, transferencia empresas, uso educativo URJC.}
+
+Con el objetivo de maximizar el impacto del trabajo realizado y facilitar su reutilización tanto en contextos académicos como profesionales, se propone la \textbf{publicación del código fuente completo} del prototipo en un repositorio público de GitHub bajo licencia open-source (MIT o Apache 2.0). Esta estrategia de difusión permitiría a otros investigadores y desarrolladores estudiar la implementación, adaptarla a sus necesidades específicas, y contribuir mejoras mediante el modelo de desarrollo colaborativo típico del software libre.
+
+Adicionalmente, se considera la posibilidad de sintetizar los resultados más relevantes del proyecto en un \textbf{artículo científico} orientado a conferencias internacionales del ámbito de las telecomunicaciones y redes móviles, tales como IEEE VTC (Vehicular Technology Conference) o IEEE WCNC (Wireless Communications and Networking Conference). La publicación en este tipo de foros contribuiría a la visibilidad del trabajo y establecería conexiones con grupos de investigación que desarrollan líneas afines en digital twins para 5G.
+
+Desde una perspectiva de transferencia tecnológica, el prototipo podría presentarse ante empresas del sector de las telecomunicaciones y la defensa mediante jornadas de innovación o convocatorias de colaboración universidad-empresa. Compañías especializadas en soluciones de comunicaciones tácticas o consultoras de planificación de redes móviles podrían estar interesadas en evaluar el sistema como base para el desarrollo de productos comerciales.
+
+En el ámbito interno de la URJC, se propone la \textbf{integración del sistema como herramienta docente} en asignaturas del Grado en Ingeniería de Sistemas de Telecomunicación relacionadas con propagación radioeléctrica, comunicaciones móviles, o planificación de redes. La interfaz visual intuitiva y la capacidad de experimentar con distintas configuraciones de antenas lo hacen especialmente apropiado para prácticas de laboratorio donde los estudiantes puedan consolidar conocimientos teóricos mediante simulación interactiva.
 
 \section{Reflexión Personal}
 \label{sec:reflexion}
 
+El desarrollo de este Trabajo de Fin de Grado ha constituido una experiencia formativa integral que ha permitido aplicar y consolidar conocimientos adquiridos a lo largo del grado, a la vez que ha supuesto un primer contacto directo con metodologías y herramientas propias del ejercicio profesional de la ingeniería de telecomunicaciones. La naturaleza interdisciplinar del proyecto ---que combina fundamentos de propagación radioeléctrica, desarrollo de software, y visualización de información geoespacial--- ha requerido un esfuerzo sostenido de investigación técnica, toma de decisiones de diseño, y resolución de problemas de integración entre componentes heterogéneos. La satisfacción de haber construido un sistema funcional de extremo a extremo, desde la simulación en MATLAB hasta la interfaz web final, compensa ampliamente las dificultades encontradas durante el proceso. Este trabajo sienta las bases para futuras investigaciones en el campo emergente de los gemelos digitales aplicados a redes 5G, un área de creciente relevancia tanto en la industria como en el ámbito académico.
