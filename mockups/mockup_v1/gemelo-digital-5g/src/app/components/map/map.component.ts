@@ -47,6 +47,16 @@ L.Icon.Default.mergeOptions({
             </div>
           }
 
+          <div class="coverage-legend-overlay" aria-label="Leyenda RSRP">
+            <span class="coverage-legend-overlay__title">RSRP</span>
+            <div class="coverage-legend-overlay__scale">
+              <span><i style="background:#ef4444"></i>&lt; −100</span>
+              <span><i style="background:#f97316"></i>−100/−85</span>
+              <span><i style="background:#fbbf24"></i>−85/−70</span>
+              <span><i style="background:#10b981"></i>&gt; −70 dBm</span>
+            </div>
+          </div>
+
           <div class="theme-selector" [title]="mapTileService.current().description">
             <span class="theme-selector__label">Tema</span>
             <div class="theme-selector__options">
@@ -105,6 +115,17 @@ L.Icon.Default.mergeOptions({
               <path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
             </svg>
           </button>
+          <button
+            class="map-control-btn"
+            [class.map-control-btn--active]="coveragePointsVisible"
+            (click)="toggleCoveragePoints()"
+            title="Mostrar/ocultar puntos de cobertura">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="4" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="20" cy="6" r="1.5"/>
+              <circle cx="4" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="20" cy="12" r="1.5"/>
+              <circle cx="4" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="20" cy="18" r="1.5"/>
+            </svg>
+          </button>
           <button class="map-control-btn" (click)="fitBounds()" title="Ajustar vista">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
@@ -125,9 +146,11 @@ export class MapComponent implements OnInit, OnDestroy {
   private heatmapLayer: any;
   private heatmapLayerB: any;
   private diffLayerGroup?: L.LayerGroup;
+  private coveragePointsLayer?: L.LayerGroup;
   private txMarker?: L.Marker;
   private txMarkerB?: L.Marker;
   private heatmapVisible = true;
+  coveragePointsVisible = true;
   private lastSimId: string | null = null;
   private resizeObserver?: ResizeObserver;
 
@@ -142,6 +165,7 @@ export class MapComponent implements OnInit, OnDestroy {
 
       if (this.map && simulation) {
         this.updateHeatmap(points);
+        this.updateCoveragePoints(points);
         this.updateTxMarker(simulation.metadata.tx_location);
         this.currentLat = simulation.metadata.tx_location.latitude;
         this.currentLon = Math.abs(simulation.metadata.tx_location.longitude);
@@ -247,6 +271,12 @@ export class MapComponent implements OnInit, OnDestroy {
     this.tileLayer = this.mapTileService.createTileLayer();
     this.tileLayer.addTo(this.map);
 
+    this.map.on('zoomend', () => {
+      if (this.coveragePointsVisible) {
+        this.updateCoveragePoints(this.simulationService.filteredCoveragePoints());
+      }
+    });
+
     // Click en el mapa → seleccionar punto más cercano
     this.map.on('click', (e: L.LeafletMouseEvent) => {
       const points = this.simulationService.filteredCoveragePoints();
@@ -268,6 +298,7 @@ export class MapComponent implements OnInit, OnDestroy {
     const simulation = this.simulationService.currentSimulation();
     if (simulation) {
       this.updateHeatmap(this.simulationService.filteredCoveragePoints());
+      this.updateCoveragePoints(this.simulationService.filteredCoveragePoints());
       this.updateTxMarker(simulation.metadata.tx_location);
       this.currentLat = simulation.metadata.tx_location.latitude;
       this.currentLon = Math.abs(simulation.metadata.tx_location.longitude);
@@ -304,10 +335,10 @@ export class MapComponent implements OnInit, OnDestroy {
     ]);
 
     this.heatmapLayer = (L as any).heatLayer(heatData, {
-      radius: 18,
-      blur: 15,
+      radius: 13,
+      blur: 9,
       maxZoom: 17,
-      max: 1.0,
+      max: 0.78,
       gradient: {
         0.0:  '#ef4444',
         0.4:  '#f97316',
@@ -511,6 +542,53 @@ export class MapComponent implements OnInit, OnDestroy {
     } else {
       this.removeHeatmapA();
     }
+  }
+
+  toggleCoveragePoints(): void {
+    this.coveragePointsVisible = !this.coveragePointsVisible;
+    if (this.coveragePointsVisible) {
+      this.updateCoveragePoints(this.simulationService.filteredCoveragePoints());
+    } else if (this.coveragePointsLayer) {
+      this.map.removeLayer(this.coveragePointsLayer);
+      this.coveragePointsLayer = undefined;
+    }
+  }
+
+  private updateCoveragePoints(points: { latitude: number; longitude: number; rsrp_dbm: number }[]): void {
+    if (this.coveragePointsLayer) {
+      this.map.removeLayer(this.coveragePointsLayer);
+      this.coveragePointsLayer = undefined;
+    }
+    if (!this.coveragePointsVisible || points.length === 0) return;
+
+    const zoom = this.map.getZoom();
+    const radius = zoom >= 16 ? 3.2 : zoom >= 13 ? 2.4 : zoom >= 11 ? 1.6 : 1.1;
+    const canvasRenderer = L.canvas({ padding: 0.35 });
+    const markers = points.map(point => L.circleMarker(
+      [point.latitude, point.longitude],
+      {
+        renderer: canvasRenderer,
+        radius,
+        weight: 0.45,
+        color: this.rsrpToColor(point.rsrp_dbm),
+        fillColor: this.rsrpToColor(point.rsrp_dbm),
+        fillOpacity: 0.72,
+        opacity: 0
+      }
+    ).bindTooltip(`${point.rsrp_dbm.toFixed(1)} dBm`, {
+      direction: 'top',
+      offset: [0, -4],
+      opacity: 0.95
+    }));
+
+    this.coveragePointsLayer = L.layerGroup(markers).addTo(this.map);
+  }
+
+  private rsrpToColor(rsrp: number): string {
+    if (rsrp >= -70) return '#10B981';
+    if (rsrp >= -85) return '#FBBF24';
+    if (rsrp >= -100) return '#F97316';
+    return '#EF4444';
   }
 
   fitBounds(): void {
