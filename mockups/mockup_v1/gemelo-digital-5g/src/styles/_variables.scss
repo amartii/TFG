@@ -4,15 +4,15 @@
 // ===========================================
 // COLORES BASE
 // ===========================================
-$color-bg-primary: #0a0e14;
-$color-bg-secondary: #111820;
-$color-bg-tertiary: #1a2332;
-$color-bg-card: #151d2a;
-$color-bg-hover: #1e2a3b;
+$color-bg-primary: #090b0f;
+$color-bg-secondary: #111419;
+$color-bg-tertiary: #171b21;
+$color-bg-card: #12161b;
+$color-bg-hover: #1d2229;
 
 // Bordes
-$color-border: #2a3544;
-$color-border-light: #3a4555;
+$color-border: #292f38;
+$color-border-light: #3b4450;
 $color-border-accent: #00d4aa;
 
 // Texto
@@ -22,8 +22,9 @@ $color-text-muted: #6e7681;
 $color-text-accent: #00d4aa;
 
 // Acentos
-$color-accent-primary: #00d4aa;
-$color-accent-secondary: #0ea5e9;
+$color-accent-primary: #6c8cff;
+$color-accent-secondary: #9aa7ba;
+$color-brand-primary: #d5deff;
 $color-accent-warning: #f59e0b;
 $color-accent-danger: #ef4444;
 
@@ -41,8 +42,8 @@ $gradient-glow: radial-gradient(ellipse at center, rgba(0, 212, 170, 0.15) 0%, t
 // ===========================================
 // TIPOGRAFÍA
 // ===========================================
-$font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-$font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+$font-primary: 'Manrope', 'Segoe UI', sans-serif;
+$font-mono: 'IBM Plex Mono', 'Cascadia Mono', monospace;
 
 $font-size-xs: 0.75rem;
 $font-size-sm: 0.875rem;
@@ -71,10 +72,10 @@ $spacing-2xl: 3rem;
 // ===========================================
 // BORDES Y SOMBRAS
 // ===========================================
-$border-radius-sm: 4px;
-$border-radius-md: 8px;
-$border-radius-lg: 12px;
-$border-radius-xl: 16px;
+$border-radius-sm: 2px;
+$border-radius-md: 4px;
+$border-radius-lg: 6px;
+$border-radius-xl: 8px;
 $border-radius-full: 9999px;
 
 $shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -85,8 +86,8 @@ $shadow-glow: 0 0 20px rgba(0, 212, 170, 0.2);
 // ===========================================
 // LAYOUT
 // ===========================================
-$header-height: 64px;
-$sidebar-width: 340px;
+$header-height: 72px;
+$sidebar-width: 312px;
 $info-panel-width: 320px;
 
 // ===========================================

@@ -19,10 +19,10 @@ import 'leaflet.heat';
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
             <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
           </svg>
-          Comparación de Simulaciones
+          Comparación de escenarios
         </div>
         <button class="comparison-header__close" (click)="comparisonService.stopComparison()">
-          ✕ Cerrar
+          ✕ Cerrar comparación
         </button>
       </div>
 
@@ -36,6 +36,14 @@ import 'leaflet.heat';
           </div>
           <div class="map-panel__map-wrap">
             <div id="comparison-map-a" class="map-panel__map"></div>
+            <div class="cmp-layer-control">
+              <button
+                class="cmp-layer-control__button"
+                [class.cmp-layer-control__button--active]="coveragePointsVisibleA"
+                (click)="toggleCoveragePointsA()">
+                Puntos A
+              </button>
+            </div>
             <div class="cmp-theme-selector">
               @for (theme of mapTileService.themes; track theme.id) {
                 <button
@@ -70,9 +78,14 @@ import 'leaflet.heat';
 
         <!-- Dashboard central -->
         <div class="dashboard">
+          <div class="dashboard__header">
+            <span>Lectura comparada</span>
+            <span class="dashboard__status">A − B</span>
+          </div>
+
           <!-- Delta principal -->
           <div class="dashboard__section">
-            <h4 class="dashboard__title">Diferencia (A − B)</h4>
+            <h4 class="dashboard__title">Diferencia media</h4>
             @if (diffStats()) {
               <div class="delta-display"
                    [class.delta-display--positive]="diffStats()!.avgDelta > 0"
@@ -103,31 +116,10 @@ import 'leaflet.heat';
           @if (diffStats() && diffStats()!.hasSpatialOverlap) {
             <div class="dashboard__section">
               <h4 class="dashboard__title">Ventaja por zona</h4>
-              <div class="advantage-bars">
-                <div class="advantage-row">
-                  <span class="advantage-label" style="color:#f97316">A mejor</span>
-                  <div class="advantage-bar-track">
-                    <div class="advantage-bar advantage-bar--a"
-                         [style.width.%]="(diffStats()!.aBetterCount / diffStats()!.totalMatched) * 100"></div>
-                  </div>
-                  <span class="advantage-count font-mono">{{ diffStats()!.aBetterCount }}</span>
-                </div>
-                <div class="advantage-row">
-                  <span class="advantage-label" style="color:#6b7280">≈ Igual</span>
-                  <div class="advantage-bar-track">
-                    <div class="advantage-bar advantage-bar--equal"
-                         [style.width.%]="(diffStats()!.similarCount / diffStats()!.totalMatched) * 100"></div>
-                  </div>
-                  <span class="advantage-count font-mono">{{ diffStats()!.similarCount }}</span>
-                </div>
-                <div class="advantage-row">
-                  <span class="advantage-label" style="color:#3b82f6">B mejor</span>
-                  <div class="advantage-bar-track">
-                    <div class="advantage-bar advantage-bar--b"
-                         [style.width.%]="(diffStats()!.bBetterCount / diffStats()!.totalMatched) * 100"></div>
-                  </div>
-                  <span class="advantage-count font-mono">{{ diffStats()!.bBetterCount }}</span>
-                </div>
+              <div class="advantage-summary">
+                <div><strong class="font-mono">{{ diffStats()!.aBetterCount }}</strong><span>A mejor</span></div>
+                <div><strong class="font-mono">{{ diffStats()!.similarCount }}</strong><span>Similar</span></div>
+                <div><strong class="font-mono">{{ diffStats()!.bBetterCount }}</strong><span>B mejor</span></div>
               </div>
             </div>
           }
@@ -180,8 +172,8 @@ import 'leaflet.heat';
                 </div>
                 <div class="params-row">
                   <span>Modelo</span>
-                  <span class="font-mono" style="font-size:9px">{{ simA()!.metadata.model }}</span>
-                  <span class="font-mono" style="font-size:9px">{{ simB()!.metadata.model }}</span>
+                  <span class="params-row__model font-mono">{{ simA()!.metadata.model }}</span>
+                  <span class="params-row__model font-mono">{{ simB()!.metadata.model }}</span>
                 </div>
               </div>
             </div>
@@ -196,6 +188,14 @@ import 'leaflet.heat';
           </div>
           <div class="map-panel__map-wrap">
             <div id="comparison-map-b" class="map-panel__map"></div>
+            <div class="cmp-layer-control cmp-layer-control--b">
+              <button
+                class="cmp-layer-control__button"
+                [class.cmp-layer-control__button--active]="coveragePointsVisibleB"
+                (click)="toggleCoveragePointsB()">
+                Puntos B
+              </button>
+            </div>
             <div class="cmp-theme-selector">
               @for (theme of mapTileService.themes; track theme.id) {
                 <button
@@ -243,9 +243,13 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
   private tileLayerB?: L.Layer;
   private heatLayerA: any;
   private heatLayerB: any;
+  private coveragePointsLayerA?: L.LayerGroup;
+  private coveragePointsLayerB?: L.LayerGroup;
   private txMarkerA?: L.Marker;
   private txMarkerB?: L.Marker;
   private resizeObserver?: ResizeObserver;
+  coveragePointsVisibleA = true;
+  coveragePointsVisibleB = true;
 
   // Tema del mapa independiente para A y B (parten del global, luego cada selector
   // los modifica de forma autónoma).
@@ -312,7 +316,9 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
       const simA = this.simA();
       if (this.mapA && simA && simA.coverage_points.length > 0) {
         this.renderHeatmap(this.mapA, simA.coverage_points, 'A');
+        this.renderCoveragePoints(this.mapA, simA.coverage_points, 'A');
         this.renderTxMarker(this.mapA, simA.metadata.tx_location, 'A');
+        this.centerMapOnTx(this.mapA, simA.metadata.tx_location, simA.coverage_points);
       }
     });
 
@@ -320,9 +326,9 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
       const simB = this.simB();
       if (this.mapB && simB && simB.coverage_points.length > 0) {
         this.renderHeatmap(this.mapB, simB.coverage_points, 'B');
+        this.renderCoveragePoints(this.mapB, simB.coverage_points, 'B');
         this.renderTxMarker(this.mapB, simB.metadata.tx_location, 'B');
-        const bounds = L.latLngBounds(simB.coverage_points.map(p => [p.latitude, p.longitude] as [number, number]));
-        this.mapB.fitBounds(bounds, { padding: [20, 20] });
+        this.centerMapOnTx(this.mapB, simB.metadata.tx_location, simB.coverage_points);
       }
     });
   }
@@ -352,17 +358,17 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
     const simA = this.simA();
     if (simA && simA.coverage_points.length > 0) {
       this.renderHeatmap(this.mapA, simA.coverage_points, 'A');
+      this.renderCoveragePoints(this.mapA, simA.coverage_points, 'A');
       this.renderTxMarker(this.mapA, simA.metadata.tx_location, 'A');
-      const bounds = L.latLngBounds(simA.coverage_points.map(p => [p.latitude, p.longitude] as [number, number]));
-      this.mapA.fitBounds(bounds, { padding: [20, 20] });
+      this.centerMapOnTx(this.mapA, simA.metadata.tx_location, simA.coverage_points);
     }
 
     const simB = this.simB();
     if (simB && simB.coverage_points.length > 0) {
       this.renderHeatmap(this.mapB, simB.coverage_points, 'B');
+      this.renderCoveragePoints(this.mapB, simB.coverage_points, 'B');
       this.renderTxMarker(this.mapB, simB.metadata.tx_location, 'B');
-      const bounds = L.latLngBounds(simB.coverage_points.map(p => [p.latitude, p.longitude] as [number, number]));
-      this.mapB.fitBounds(bounds, { padding: [20, 20] });
+      this.centerMapOnTx(this.mapB, simB.metadata.tx_location, simB.coverage_points);
     }
 
     // Forzar a Leaflet a recalcular dimensiones cuando el host alcance su tamaño final
@@ -382,6 +388,40 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
       this.resizeObserver.observe(containerA);
       this.resizeObserver.observe(containerB);
     }
+
+    this.mapA.on('zoomend', () => {
+      if (this.coveragePointsVisibleA) {
+        const sim = this.simA();
+        if (sim) this.renderCoveragePoints(this.mapA, sim.coverage_points, 'A');
+      }
+    });
+    this.mapB.on('zoomend', () => {
+      if (this.coveragePointsVisibleB) {
+        const sim = this.simB();
+        if (sim) this.renderCoveragePoints(this.mapB, sim.coverage_points, 'B');
+      }
+    });
+  }
+
+  private centerMapOnTx(
+    map: L.Map,
+    txLocation: { latitude: number; longitude: number },
+    points: { latitude: number; longitude: number }[]
+  ): void {
+    if (points.length === 0) {
+      map.setView([txLocation.latitude, txLocation.longitude], 13, { animate: false });
+      return;
+    }
+
+    const bounds = L.latLngBounds(
+      points.map(point => [point.latitude, point.longitude] as [number, number])
+    );
+    const zoom = map.getBoundsZoom(bounds, false, L.point(24, 24));
+    map.setView(
+      [txLocation.latitude, txLocation.longitude],
+      Math.min(zoom, 15),
+      { animate: false }
+    );
   }
 
   private renderHeatmap(map: L.Map, points: { latitude: number; longitude: number; rsrp_dbm: number }[], which: 'A' | 'B'): void {
@@ -393,13 +433,75 @@ export class ComparisonViewComponent implements OnInit, OnDestroy {
     ]);
 
     const layer = (L as any).heatLayer(heatData, {
-      radius: 18, blur: 15, maxZoom: 17, max: 1.0,
+      radius: 13, blur: 9, maxZoom: 17, max: 0.78,
       gradient: { 0.0: '#ef4444', 0.4: '#f97316', 0.55: '#fbbf24', 0.7: '#10b981' }
     });
     layer.addTo(map);
 
     if (which === 'A') this.heatLayerA = layer;
     else this.heatLayerB = layer;
+  }
+
+  toggleCoveragePointsA(): void {
+    this.coveragePointsVisibleA = !this.coveragePointsVisibleA;
+    if (this.coveragePointsVisibleA) {
+      const sim = this.simA();
+      if (sim) this.renderCoveragePoints(this.mapA, sim.coverage_points, 'A');
+    } else if (this.coveragePointsLayerA) {
+      this.mapA.removeLayer(this.coveragePointsLayerA);
+      this.coveragePointsLayerA = undefined;
+    }
+  }
+
+  toggleCoveragePointsB(): void {
+    this.coveragePointsVisibleB = !this.coveragePointsVisibleB;
+    if (this.coveragePointsVisibleB) {
+      const sim = this.simB();
+      if (sim) this.renderCoveragePoints(this.mapB, sim.coverage_points, 'B');
+    } else if (this.coveragePointsLayerB) {
+      this.mapB.removeLayer(this.coveragePointsLayerB);
+      this.coveragePointsLayerB = undefined;
+    }
+  }
+
+  private renderCoveragePoints(
+    map: L.Map,
+    points: { latitude: number; longitude: number; rsrp_dbm: number }[],
+    which: 'A' | 'B'
+  ): void {
+    const existing = which === 'A' ? this.coveragePointsLayerA : this.coveragePointsLayerB;
+    if (existing) map.removeLayer(existing);
+
+    const zoom = map.getZoom();
+    const radius = zoom >= 16 ? 3.2 : zoom >= 13 ? 2.4 : zoom >= 11 ? 1.6 : 1.1;
+    const canvasRenderer = L.canvas({ padding: 0.35 });
+    const markers = points.map(point => L.circleMarker(
+      [point.latitude, point.longitude],
+      {
+        renderer: canvasRenderer,
+        radius,
+        weight: 0.45,
+        color: this.rsrpToColor(point.rsrp_dbm),
+        fillColor: this.rsrpToColor(point.rsrp_dbm),
+        fillOpacity: 0.72,
+        opacity: 0
+      }
+    ).bindTooltip(`${point.rsrp_dbm.toFixed(1)} dBm`, {
+      direction: 'top',
+      offset: [0, -4],
+      opacity: 0.95
+    }));
+
+    const layer = L.layerGroup(markers).addTo(map);
+    if (which === 'A') this.coveragePointsLayerA = layer;
+    else this.coveragePointsLayerB = layer;
+  }
+
+  private rsrpToColor(rsrp: number): string {
+    if (rsrp >= -70) return '#10B981';
+    if (rsrp >= -85) return '#FBBF24';
+    if (rsrp >= -100) return '#F97316';
+    return '#EF4444';
   }
 
   private renderTxMarker(map: L.Map, location: { latitude: number; longitude: number }, which: 'A' | 'B'): void {

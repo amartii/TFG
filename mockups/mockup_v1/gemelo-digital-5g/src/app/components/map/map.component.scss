@@ -50,6 +50,46 @@
   gap: $spacing-sm;
 }
 
+.coverage-legend-overlay {
+  min-width: 190px;
+  padding: $spacing-sm $spacing-md;
+  background: rgba($color-bg-card, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  backdrop-filter: blur(14px) saturate(120%);
+
+  &__title {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-primary);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.08em;
+  }
+
+  &__scale {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(82px, 1fr));
+    gap: 4px 8px;
+
+    span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-muted);
+      font-size: 9px;
+      white-space: nowrap;
+    }
+
+    i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex: 0 0 8px;
+    }
+  }
+}
+
 // ── Selector de tema del mapa ────────────────────────────────────────────────
 
 .theme-selector {
@@ -171,6 +211,15 @@
 
     svg {
       color: var(--accent-primary);
+    }
+  }
+
+  &--active {
+    border-color: $color-accent-primary;
+    background: rgba($color-accent-primary, 0.15);
+
+    svg {
+      color: $color-accent-primary;
     }
   }
 }

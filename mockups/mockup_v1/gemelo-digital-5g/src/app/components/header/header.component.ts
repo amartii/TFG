@@ -10,9 +10,18 @@ import { SimulationService } from '../../services/simulation.service';
   template: `
     <header class="header">
       <div class="header__brand">
-        <h1 class="header__title">GD5G</h1>
-        <span class="header__divider">|</span>
-        <span class="header__subtitle">Gemelo Digital 5G — Cobertura Táctica</span>
+        <span class="header__mark" aria-hidden="true">
+          <svg viewBox="0 0 38 38" fill="none">
+            <circle cx="19" cy="19" r="16" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M19 8v22M11 23l8-15 8 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="19" cy="19" r="3" fill="currentColor"/>
+            <path d="M8 19h22" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+          </svg>
+        </span>
+        <div class="header__identity">
+          <h1 class="header__title">Gemelo 5G</h1>
+          <span class="header__subtitle">Planificación de cobertura</span>
+        </div>
       </div>
 
       <nav class="header__nav">

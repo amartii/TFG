@@ -18,13 +18,13 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
         <section class="sidebar__section">
           <div class="section-header">
             <span class="section-dot"></span>
-            <h3 class="section-title">Simulación Activa</h3>
+            <h3 class="section-title">Escenario activo</h3>
           </div>
 
           @if (simulationService.loading()) {
             <div class="loading-indicator">
               <span class="spinner"></span>
-              <span>Cargando simulación...</span>
+              <span>Cargando escenario...</span>
             </div>
           }
 
@@ -44,7 +44,7 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
         <section class="sidebar__section">
           <div class="section-header">
             <span class="section-dot"></span>
-            <h3 class="section-title">Comparación</h3>
+            <h3 class="section-title">Comparación de escenarios</h3>
           </div>
 
           @if (!comparisonService.active()) {
@@ -52,7 +52,7 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
               class="btn btn--compare"
               [disabled]="comparisonService.comparableSimulations().length === 0"
               (click)="comparisonService.startComparison()">
-              Comparar simulaciones
+              Comparar escenarios
             </button>
           } @else {
             <div class="comparison-controls">
@@ -85,7 +85,7 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
 
               @if (comparisonService.simulationB()) {
                 <div class="comparison-hint">
-                  Vista dividida activa — dashboard en panel central
+                  Dos vistas independientes con lectura agregada
                 </div>
               }
 
@@ -103,12 +103,12 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
         <section class="sidebar__section">
           <div class="section-header">
             <span class="section-dot"></span>
-            <h3 class="section-title">Filtro de Cobertura</h3>
+            <h3 class="section-title">Umbral de señal</h3>
           </div>
 
           <div class="filter-control">
             <div class="filter-labels">
-              <span>Umbral RSRP mínimo</span>
+              <span>Mostrar desde RSRP</span>
               <span class="filter-value font-mono">{{ simulationService.currentThreshold() }} dBm</span>
             </div>
             <input
@@ -143,11 +143,11 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
 
       <div class="sidebar__footer">
         <div class="footer-info">
-          <span>Última actualización: {{ lastUpdate }}</span>
+          <span>Datos locales · JavaScript y API REST</span>
         </div>
         <div class="footer-credits">
-          <span>TFG - Álvaro Martínez Téllez</span>
-          <span class="text-muted">URJC 2025/2026</span>
+          <span>TFG · Álvaro Martínez Téllez</span>
+          <span class="text-muted">URJC · 2025/2026</span>
         </div>
       </div>
     </aside>
@@ -157,7 +157,6 @@ import { SimulationConfigComponent } from '../simulation-config/simulation-confi
 export class SidebarComponent {
   simulationService = inject(SimulationService);
   comparisonService = inject(ComparisonService);
-  lastUpdate = new Date().toLocaleTimeString('es-ES');
 
   async onSimulationChange(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
