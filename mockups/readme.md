@@ -1,5 +1,9 @@
 **Mockup de Frontend completo para el Gemelo Digital 5G** de planificación de cobertura de burbujas tácticas.
 
+Este documento describe los prototipos originales. La aplicación Angular actual
+está en [`frontend/`](../frontend/); `mockup_v1/gemelo-digital-5g-demo/` se
+conserva como demo histórica.
+
 ## Características Implementadas
 
 ### Interfaz Principal
@@ -31,7 +35,7 @@
 
 ### Arquitectura
 
-**gemelo-digital-5g (Angular):**
+**Estructura original del prototipo Angular (actualmente en `frontend/`):**
 
 ```
 src/

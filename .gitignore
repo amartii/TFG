@@ -24,8 +24,10 @@ shared-tasks/
 
 # Angular build cache y artefactos compilados
 .angular/
+frontend/dist/
 mockups/mockup_v1/gemelo-digital-5g/dist/
 
 # Carpeta de outputs antiguos de MATLAB
 matlab/output/aoutputs\ v1/
 "matlab/output/aoutputs v1/"
+matlab/output/calibrations/
