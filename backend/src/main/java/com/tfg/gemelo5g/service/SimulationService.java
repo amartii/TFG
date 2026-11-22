@@ -2,6 +2,9 @@ package com.tfg.gemelo5g.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tfg.gemelo5g.exception.InvalidSimulationIdException;
+import com.tfg.gemelo5g.exception.SimulationDeletionException;
+import com.tfg.gemelo5g.exception.SimulationIdentityMismatchException;
 import com.tfg.gemelo5g.exception.SimulationNotFoundException;
 import com.tfg.gemelo5g.model.SimulationSummaryDto;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,11 +17,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
- * Lee los ficheros JSON generados por MATLAB del directorio configurado en
- * {@code simulations.data-dir} (application.properties).
+ * Lee resultados históricos compatibles y simulaciones Java del directorio
+ * configurado en {@code simulations.data-dir} (application.properties).
  *
  * Cada fichero corresponde a una simulación: <uuid>.json
  */
@@ -67,13 +71,13 @@ public class SimulationService {
         if (!file.startsWith(dataDir) || !Files.exists(file)) {
             throw new SimulationNotFoundException(id);
         }
-        return mapper.readTree(file.toFile());
+        return readAndValidateIdentity(file, id);
     }
 
     /**
      * Devuelve el fichero JSON como Resource para descarga directa.
      */
-    public Resource getFileResource(String id) {
+    public Resource getFileResource(String id) throws IOException {
         if (!id.matches(UUID_REGEX)) {
             throw new SimulationNotFoundException(id);
         }
@@ -81,24 +85,79 @@ public class SimulationService {
         if (!file.startsWith(dataDir) || !Files.exists(file)) {
             throw new SimulationNotFoundException(id);
         }
+        readAndValidateIdentity(file, id);
         return new FileSystemResource(file);
+    }
+
+    public void deleteById(String id) {
+        if (id == null || !id.matches(UUID_REGEX)) {
+            throw new InvalidSimulationIdException(id);
+        }
+        String normalizedId = id.toLowerCase(Locale.ROOT);
+        Path file = dataDir.resolve(normalizedId + ".json").normalize();
+        if (!file.startsWith(dataDir) || !Files.isRegularFile(file)) {
+            throw new SimulationNotFoundException(id);
+        }
+        try {
+            readAndValidateIdentity(file, normalizedId);
+            if (!Files.deleteIfExists(file)) {
+                throw new SimulationNotFoundException(id);
+            }
+        } catch (IOException e) {
+            throw new SimulationDeletionException(normalizedId, e);
+        }
+    }
+
+    private JsonNode readAndValidateIdentity(Path file, String expectedId) throws IOException {
+        JsonNode root = mapper.readTree(file.toFile());
+        if (root == null || !root.isObject()) {
+            throw new IOException("El archivo no contiene un objeto JSON válido.");
+        }
+        String actualId = root.path("id").asText();
+        if (!expectedId.equalsIgnoreCase(actualId)) {
+            throw new SimulationIdentityMismatchException(expectedId, actualId);
+        }
+        return root;
     }
 
     // -----------------------------------------------------------------------
 
     private SimulationSummaryDto parseSummary(Path file) {
         try {
-            JsonNode root = mapper.readTree(file.toFile());
+            JsonNode root = readAndValidateIdentity(file, fileId(file));
+            JsonNode metadata = root.get("metadata");
+            if (!root.path("name").isTextual() || !hasRequiredSummaryMetadata(metadata)) {
+                return invalidSummary(file, "Faltan campos obligatorios de nombre o metadata.");
+            }
             return new SimulationSummaryDto(
-                    root.path("id").asText(),
+                    fileId(file),
                     root.path("name").asText(),
                     root.path("createdAt").asText(),
-                    root.path("metadata")
+                    metadata,
+                    true,
+                    null
             );
-        } catch (IOException e) {
-            // Si un fichero está corrupto, devolver un DTO con id = nombre del fichero
-            String name = file.getFileName().toString().replace(".json", "");
-            return new SimulationSummaryDto(name, "ERROR: " + e.getMessage(), null, null);
+        } catch (IOException | SimulationIdentityMismatchException e) {
+            return invalidSummary(file, e.getMessage());
         }
+    }
+
+    private boolean hasRequiredSummaryMetadata(JsonNode metadata) {
+        return metadata != null && metadata.isObject()
+                && metadata.path("frequency_ghz").isNumber()
+                && metadata.path("tx_power_dbm").isNumber()
+                && metadata.path("antenna_height_m").isNumber()
+                && metadata.path("tx_location").path("latitude").isNumber()
+                && metadata.path("tx_location").path("longitude").isNumber()
+                && metadata.path("model").isTextual();
+    }
+
+    private SimulationSummaryDto invalidSummary(Path file, String error) {
+        return new SimulationSummaryDto(fileId(file), null, null, null, false, error);
+    }
+
+    private String fileId(Path file) {
+        String filename = file.getFileName().toString();
+        return filename.substring(0, filename.length() - ".json".length());
     }
 }

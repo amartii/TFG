@@ -145,9 +145,9 @@ for idx = 1:length(escenarios)
     lon0        = esc.lon0;
     areaKm      = esc.areaKm;
     nPuntos     = esc.nPuntos;
-    gridSpacing_m = (areaKm * 1000) / nPuntos;
+    gridSpacing_m = (areaKm * 1000) / (nPuntos - 1);
     
-    fprintf('EIRP: %.1f dBm | Espaciado grid: %.0f m\n', EIRP_dBm, gridSpacing_m);
+    fprintf('EIRP: %.1f dBm | Espaciado efectivo grid: %.2f m\n', EIRP_dBm, gridSpacing_m);
     
     % --- PASO 2: Generación de la cuadrícula (análogo al Bloque 2) ---
     deltaLat_deg = (areaKm / 2) / 111;
@@ -263,13 +263,15 @@ for idx = 1:length(escenarios)
     
     % --- PASO 5: Cálculo del RSRP (análogo al Bloque 5) ---
     % Corrección por Resource Blocks según ancho de banda
-    if fc_Hz >= 3e9  % FR1 mid-band (n78, n79): 100 MHz, SCS 30kHz → 66 RB
-        NRB = 66;
-    else             % FR1 low-band (n28): 10-20 MHz, SCS 15kHz → 52 RB promedio
-        NRB = 52;
+    % Factores de normalización heredados; este escenario no configura
+    % ancho de banda ni SCS, por lo que no se interpretan como RB asignados.
+    if fc_Hz >= 3e9
+        NRB_ASSUMED = 66;
+    else
+        NRB_ASSUMED = 52;
     end
     
-    delta_RSRP_dB = 10 * log10(NRB * 12);
+    delta_RSRP_dB = 10 * log10(NRB_ASSUMED * 12);
     RSRP_dBm = Prx_dBm - delta_RSRP_dB;
     
     % Aplicar límites físicos

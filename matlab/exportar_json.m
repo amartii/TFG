@@ -19,7 +19,8 @@ function fichero_json = exportar_json(nombre, lats, lons, rsrp_dBm, params)
 %                 .lat_emplazamiento    Latitud del gNodeB [°]
 %                 .lon_emplazamiento    Longitud del gNodeB [°]
 %                 .area_km              Lado del área de simulación [km]
-%                 .espaciado_grid_m     Resolución de la cuadrícula [m]
+%                 .espaciado_grid_m     Espaciado efectivo entre puntos [m]
+%                 .espaciado_grid_solicitado_m (opcional) Espaciado máximo pedido [m]
 %                 .modelo_propagacion   Nombre del modelo ('Longley-Rice', etc.)
 %                 .datos_elevacion      Fuente de elevación ('SRTM_30m', etc.)
 %

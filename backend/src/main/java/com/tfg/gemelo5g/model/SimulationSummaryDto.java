@@ -11,5 +11,7 @@ public record SimulationSummaryDto(
         String id,
         String name,
         String createdAt,
-        JsonNode metadata
+        JsonNode metadata,
+        boolean valid,
+        String error
 ) {}
