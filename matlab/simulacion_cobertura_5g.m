@@ -62,9 +62,13 @@ lon0 = -3.8244;   % Longitud [grados decimales]
 
 % --- Parámetros de la cuadrícula de simulación ---
 areaKm        = 3;       % Lado del área cuadrada [km]
-gridSpacing_m = 50;      % Espaciado de la cuadrícula [m]
-nPuntos       = areaKm * 1000 / gridSpacing_m;  % Puntos por lado = 60
+gridSpacingRequested_m = 50;  % Espaciado máximo solicitado [m]
+nIntervalos   = ceil(areaKm * 1000 / gridSpacingRequested_m - 1e-9);
+nPuntos        = nIntervalos + 1;   % Ambos extremos incluidos
+gridSpacing_m  = areaKm * 1000 / nIntervalos;  % Espaciado efectivo [m]
 fprintf('Cuadrícula: %dx%d = %d puntos totales\n', nPuntos, nPuntos, nPuntos^2);
+fprintf('Espaciado solicitado/efectivo: %.2f / %.2f m\n', ...
+    gridSpacingRequested_m, gridSpacing_m);
 
 % Conversión del área a grados (aprox: 1° lat ≈ 111 km, 1° lon ≈ 111*cos(lat) km)
 deltaLat_deg = (areaKm / 2) / 111;
@@ -277,20 +281,12 @@ fprintf('Prx FSPL (ref) : [%.1f, %.1f] dBm\n', min(Prx_dBm_FSPL), max(Prx_dBm_FS
 %% =========================================================================
 %  BLOQUE 5: CÁLCULO DEL RSRP (Reference Signal Received Power)
 %  =========================================================================
-% En 5G NR, el RSRP se mide sobre los Resource Elements (RE) de los
-% Reference Signals (SSB/CSI-RS), no sobre todo el ancho de banda.
-%
-% RSRP = Prx_total - 10*log10(N_RE_BW)
-%
-% Para 5G NR FR1, banda n78 (100 MHz, SCS=30 kHz):
-%   - N_RB = 66 bloques de recurso en 100 MHz con SCS=30kHz (3GPP TS 38.104)
-%   - N_RE_per_RB = 12 subportadoras
-%   - N_RE_BW = 66 * 12 = 792 RE totales de datos
-%   - Los RE de SSB ocupan 240 subportadoras (20 RB × 12)
-%   - Corrección aproximada: -10*log10(N_RB) ≈ -18 dB
-
-NRB_100MHz = 66;           % Resource Blocks para 100 MHz, SCS=30kHz (n78)
-delta_RSRP_dB = 10 * log10(NRB_100MHz * 12);  % ≈ 19.8 dB
+% Aproximación heredada: repartir Prx_total uniformemente sobre 66*12 RE.
+% No es una implementación completa de la definición RSRP de 3GPP.
+% Este escenario no configura ancho de banda/SCS; 66 RB es una hipótesis
+% fija del prototipo y no debe atribuirse a 100 MHz/30 kHz.
+NRB_ASSUMED = 66;
+delta_RSRP_dB = 10 * log10(NRB_ASSUMED * 12);  % 28.99 dB
 
 RSRP_dBm = Prx_dBm - delta_RSRP_dB;
 
@@ -368,6 +364,7 @@ params.lat_emplazamiento = lat0;
 params.lon_emplazamiento = lon0;
 params.area_km           = areaKm;
 params.espaciado_grid_m  = gridSpacing_m;
+params.espaciado_grid_solicitado_m = gridSpacingRequested_m;
 params.modelo_propagacion = modelo_usado;     % asignado en Bloque 4
 params.datos_elevacion    = terrain_desc;    % asignado en Bloque 4
 

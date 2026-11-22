@@ -58,9 +58,13 @@ lon0 = -3.8244;
 
 % --- Cuadrícula 5×5 km con resolución 100 m (50×50 = 2500 puntos) ---
 areaKm        = 5;
-gridSpacing_m = 100;
-nPuntos       = areaKm * 1000 / gridSpacing_m;   % 50 puntos por lado
+gridSpacingRequested_m = 100;
+nIntervalos   = ceil(areaKm * 1000 / gridSpacingRequested_m - 1e-9);
+nPuntos       = nIntervalos + 1;
+gridSpacing_m = areaKm * 1000 / nIntervalos;
 fprintf('Cuadrícula: %dx%d = %d puntos totales\n', nPuntos, nPuntos, nPuntos^2);
+fprintf('Espaciado solicitado/efectivo: %.2f / %.2f m\n', ...
+    gridSpacingRequested_m, gridSpacing_m);
 
 deltaLat_deg = (areaKm / 2) / 111;
 deltaLon_deg = (areaKm / 2) / (111 * cosd(lat0));
@@ -243,6 +247,7 @@ params.lat_emplazamiento = lat0;
 params.lon_emplazamiento = lon0;
 params.area_km           = areaKm;
 params.espaciado_grid_m  = gridSpacing_m;
+params.espaciado_grid_solicitado_m = gridSpacingRequested_m;
 params.modelo_propagacion = modelo_usado;
 if tiene_srtm
     params.datos_elevacion = 'SRTM_30m';

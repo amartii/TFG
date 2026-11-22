@@ -1,0 +1,27 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "name": "Demo sintética",
+  "createdAt": "2026-01-01T00:00:00Z",
+  "metadata": {
+    "frequency_ghz": 3.5,
+    "tx_power_dbm": 40,
+    "antenna_height_m": 10,
+    "tx_location": { "latitude": 40.2897, "longitude": -3.8244 },
+    "simulation_date": "2026-01-01T00:00:00Z",
+    "model": "Datos sintéticos ilustrativos",
+    "terrain_data": "Sintético; sin datos de elevación",
+    "scenario_name": "Demo sintética (no validada)"
+  },
+  "parameters": { "area_km": 1, "espaciado_grid_m": 500 },
+  "coveragePoints": [
+    { "lat": 40.2852, "lng": -3.8303, "rsrp": -105 },
+    { "lat": 40.2852, "lng": -3.8244, "rsrp": -92 },
+    { "lat": 40.2852, "lng": -3.8185, "rsrp": -104 },
+    { "lat": 40.2897, "lng": -3.8303, "rsrp": -90 },
+    { "lat": 40.2897, "lng": -3.8244, "rsrp": -60 },
+    { "lat": 40.2897, "lng": -3.8185, "rsrp": -88 },
+    { "lat": 40.2942, "lng": -3.8303, "rsrp": -103 },
+    { "lat": 40.2942, "lng": -3.8244, "rsrp": -91 },
+    { "lat": 40.2942, "lng": -3.8185, "rsrp": -102 }
+  ]
+}

@@ -70,7 +70,7 @@ lat0        = 40.2897;      % Latitud campus URJC [°]
 lon0        = -3.8244;      % Longitud campus URJC [°]
 areaKm      = 3;            % Área: 3×3 km
 nPuntos     = 60;           % Cuadrícula: 60×60 puntos
-gridSpacing_m = (areaKm * 1000) / nPuntos;
+gridSpacing_m = (areaKm * 1000) / (nPuntos - 1);
 
 fprintf('Escenario: URJC Fuenlabrada (Suburbano)\n');
 fprintf('Ubicación: %.4f°N, %.4f°W\n', lat0, -lon0);
@@ -129,9 +129,10 @@ dist_m  = max(dist_m, 1);  % Evitar división por cero
 FSPL_dB       = 20*log10(dist_m) + 20*log10(fc_Hz) + 20*log10(4*pi/c);
 Prx_dBm_FSPL  = EIRP_dBm + Grx_dBi - FSPL_dB;
 
-% Conversión a RSRP (66 RB para 100 MHz, SCS 30kHz, banda n78)
-NRB_100MHz = 66;
-delta_RSRP_dB = 10 * log10(NRB_100MHz * 12);
+% Factor de normalización heredado: 66*12 RE asumidos. Este escenario no
+% configura ancho de banda/SCS; no atribuirlo a 100 MHz/30 kHz.
+NRB_ASSUMED = 66;
+delta_RSRP_dB = 10 * log10(NRB_ASSUMED * 12);
 RSRP_FSPL = Prx_dBm_FSPL - delta_RSRP_dB;
 
 % Clamp a rango válido
