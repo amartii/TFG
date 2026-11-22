@@ -45,9 +45,13 @@ sin infraestructura fija \cite{3gpp_rel17_2022}.
 URLLC (latencia < 1~ms, disponibilidad 99,999~\%) y mMTC (\textit{massive Machine-Type
 Communications}, 10$^6$ dispositivos/km$^2$). Las métricas de calidad de señal en la
 interfaz radio más habituales son el RSRP (\textit{Reference Signal Received Power})
-definido en 3GPP TS 38.215 \cite{3gpp_ts38215_2022}, el RSRQ (\textit{Reference Signal
-Received Quality}) y el SINR (\textit{Signal-to-Interference-plus-Noise Ratio}). El RSRP
-es la magnitud primaria que produce la simulación de este TFG.
+definido en 3GPP TS 38.215 \cite{3gpp_ts38215_2022} y el RSRQ (\textit{Reference Signal
+Received Quality}). TS 38.133,
+apartado~10.1.6, especifica el mapeo de mediciones RSRP a valores de informe
+\cite{etsi_ts138133_v153400_2026}; ese mapeo no define categorías universales de calidad
+ni garantiza por sí solo el servicio de una aplicación. La simulación de este TFG produce
+una estimación de RSRP, y las bandas de color descritas más adelante son umbrales visuales
+propios del prototipo, no umbrales normativos de calidad.
 
 % ============================================================
 \section{Redes tácticas y burbujas 5G desplegables}
@@ -82,9 +86,8 @@ revisamos los modelos más relevantes para el rango FR1 (sub-6 GHz).
 \subsection{Pérdidas en el espacio libre (FSPL)}
 \label{subsec:fspl}
 
-La pérdida en espacio libre es la referencia teórica de mínimas pérdidas, asumiendo que
-no existe ningún obstáculo entre TX y RX y que la propagación sigue únicamente la ley del
-inverso del cuadrado de la distancia. La fórmula de Friis da:
+La FSPL es la pérdida de referencia para una onda que se propaga en espacio libre, bajo
+las hipótesis de trayecto despejado y propagación en campo lejano. La fórmula de Friis da:
 
 \begin{equation}
 \text{FSPL}~[\text{dB}] = 20\log_{10}(d) + 20\log_{10}(f_c) + 20\log_{10}\!\left(\frac{4\pi}{c}\right)
@@ -92,10 +95,11 @@ inverso del cuadrado de la distancia. La fórmula de Friis da:
 \end{equation}
 
 donde $d$ es la distancia en metros, $f_c$ la frecuencia en Hz y $c$ la velocidad de la
-luz. A 3,5~GHz, por ejemplo, la FSPL a 1~km es aproximadamente 123~dB. Este valor sirve
-como cota inferior de las pérdidas reales: cualquier modelo de propagación en exteriores
-producirá pérdidas mayores porque incorpora el efecto del terreno, los edificios y la
-difracción.
+luz. A 3,5~GHz y 1~km, la ecuación da aproximadamente 103,33~dB. La FSPL es una referencia
+teórica, no una cota universal de las pérdidas observadas: en un entorno real, la
+interferencia multitrayecto puede ser constructiva en ciertas posiciones y elevar el nivel
+local recibido respecto a esa referencia. Obstáculos, terreno y difracción también pueden
+modificar el balance de propagación.
 
 \subsection{Modelos Okumura-Hata y COST-231}
 \label{subsec:hata}
@@ -109,9 +113,10 @@ El proyecto COST-231 extendió el modelo de Hata hasta los 2000~MHz para dar cob
 la banda GSM-1800 y UMTS, añadiendo la constante $C_m$ que diferencia el entorno urbano
 grande ($C_m = 3$~dB) del medio \cite{cost231finalreport1999}. La expresión resultante
 (ecuación \ref{eq:cost231} del capítulo de implementación) es rápida y no requiere datos
-de terreno, lo que la hizo estándar en la planificación de redes 2G/3G. Sin embargo,
-su rango de validez estricto termina en 2~GHz, y su extrapolación a 3,5~GHz introduce
-errores de 2--5~dB respecto a medidas reales \cite{3gpp_tr38901_2022}.
+de terreno, lo que la hizo habitual en la planificación de redes 2G/3G. Su rango de
+aplicación documentado llega hasta 2~GHz; por ello, no se toma su extrapolación a 3,5~GHz
+como una predicción validada ni se atribuye a dicha extrapolación un error típico sin una
+fuente experimental y un escenario comparables.
 
 \subsection{Modelo Longley-Rice (ITM)}
 \label{subsec:longleyrice}
@@ -145,38 +150,41 @@ con \textit{clusters} de \textit{rays} caracterizados por su retardo, ángulo de
 llegada y amplitud. Los escenarios definidos son UMi (\textit{Urban Micro}), UMa
 (\textit{Urban Macro}), RMa (\textit{Rural Macro}) y \textit{Indoor Hotspot}.
 
-Para la herramienta de este TFG no utilizamos TR 38.901 directamente como modelo de
-propagación porque sus realizaciones estocásticas no son comparables punto a punto con
-medidas de campo sin promediar sobre muchos snapshots. Sin embargo, sí empleamos sus
-umbrales de RSRP para clasificar la calidad de cobertura (véase el
-Cuadro~\ref{tab:rsrp_umbrales} en §4.1.6 del capítulo de implementación).
+El modelo de canal de TR~38.901 no se utiliza en este TFG como motor de propagación ni
+como método de validación. Se incluye como referencia del modelado de canal estocástico
+para 5G NR; las magnitudes de medida de potencia de referencia se especifican en
+3GPP TS~38.215 \cite{3gpp_ts38215_2022}.
 
 \subsection{Comparativa de modelos}
 \label{subsec:comparativa_modelos}
 
 El Cuadro~\ref{tab:comparativa_modelos} sintetiza las características principales de los
-cuatro modelos presentados en esta sección, con el fin de justificar la selección del
-modelo Longley-Rice como motor de propagación del gemelo digital.
+cuatro modelos presentados en esta sección. Longley--Rice se utiliza como referencia
+MATLAB, mientras que FSPL forma parte del motor Java bajo demanda.
 
 \begin{table}[htbp]
 \centering
 \caption{Comparativa de modelos de propagación radioeléctrica.}
 \label{tab:comparativa_modelos}
 \footnotesize
-\begin{tabular}{lcccc}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm}*{4}{>{\centering\arraybackslash}X}}
 \hline
 \textbf{Criterio} & \textbf{FSPL} & \textbf{COST-231} & \textbf{Longley-Rice} & \textbf{TR 38.901} \\
 \hline
 Rango de frecuencia      & Cualquiera     & 1,5--2 GHz       & 20 MHz--20 GHz       & 0,5--100 GHz \\
 Rango de distancia       & Cualquiera     & 1--20 km         & 1--2000 km           & $<$5 km \\
-Datos de terreno         & No             & No               & Sí (SRTM)            & Estadístico \\
+Perfil de terreno       & No             & No               & Sí                   & No \\
 Tipo de resultado        & Determinista   & Determinista     & Determinista         & Estocástico \\
-Error típico a 3,5 GHz   & 0 dB (teórico) & $\pm$15--20 dB   & $\pm$6--10 dB        & $\pm$4--8 dB \\
 Coste computacional      & Mínimo         & Bajo             & Medio                & Alto \\
-Uso en este TFG          & Referencia     & Fallback         & \textbf{Principal}   & Validación \\
+Uso en este TFG          & Componente Java & Fallback MATLAB & \textbf{Referencia MATLAB} & Contexto \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
+
+Además, el motor Java bajo demanda suma a la pérdida FSPL una pérdida de difracción
+calculada con el método de Deygout~\cite{deygout1966multiple}. Esta combinación usa el
+perfil local del terreno y no es equivalente a Longley--Rice; la comparación observada
+entre ambos motores se documenta en el Capítulo~\ref{cap:capitulo5}.
 
 % ============================================================
 \section{Herramientas de planificación radioeléctrica}
@@ -184,15 +192,15 @@ Uso en este TFG          & Referencia     & Fallback         & \textbf{Principal
 % ============================================================
 
 Existen varias herramientas de planificación de cobertura en el mercado. Las evaluamos
-desde la perspectiva de su adecuación a un despliegue táctico rápido, donde el operador
-necesita resultados en menos de cinco minutos con datos de terreno actualizados.
+desde la perspectiva de su adecuación a un despliegue táctico, considerando su modelo de
+licencia, los motores de propagación, la disponibilidad de datos de terreno y las opciones
+de integración. No se dispone de un ensayo homogéneo de rendimiento entre ellas.
 
 \paragraph{Xirio Online.} Plataforma SaaS española de INDRA que ofrece cálculo de
-cobertura por \textit{ray-tracing} y modelos estadísticos sobre cartografía OSM. Su
-precisión es elevada, especialmente en entornos urbanos densos, pero el acceso requiere
-suscripción ($\sim$5000~€/año) y el cálculo de un mapa de 100~km$^2$ puede tardar varios
-minutos en la capa de servidor compartida. No dispone de API pública documentada para
-integración automatizada \cite{xirio2024}.
+cobertura por \textit{ray-tracing} y modelos estadísticos sobre cartografía. Su acceso
+comercial está sujeto a las modalidades y condiciones vigentes del proveedor, por lo que
+no se asigna aquí un precio anual no contrastado. Las características de integración y
+rendimiento deben verificarse para la modalidad concreta contratada \cite{xirio2024}.
 
 \paragraph{Atoll (Forsk).} Herramienta de escritorio y de red que soporta LTE, 5G NR y
 Wi-Fi. Es el estándar de facto en los departamentos de ingeniería de los operadores europeos.
@@ -217,33 +225,35 @@ descarta para uso táctico en zonas sin acceso a internet \cite{cloudrf2024}.
 orientada a radioaficionados y emergencias. Usa modelos ITM e ITU-R P.370. Su interfaz
 ha quedado obsoleta y carece de soporte para 5G NR.
 
-\subparagraph{Gap identificado.} Ninguna de las herramientas anteriores cumple
-simultáneamente los tres requisitos clave de un entorno táctico desplegable:
-(1)~gratuita y sin dependencia de servidores externos; (2)~exportación estandarizada de
-resultados (JSON) para integración con sistemas de mando y control; y (3)~interfaz web
-moderna usable por un operador sin formación en RF. Este TFG cubre ese hueco.
+\subparagraph{Gap identificado.} El prototipo de este TFG combina la consulta de escenarios MATLAB precalculados con una
+simulación interactiva bajo demanda en Java, mediante una API REST y una interfaz web. La
+generación de una nueva predicción en la aplicación no requiere MATLAB; este sí sigue siendo
+necesario para reproducir los escenarios de referencia y ejecutar el motor Longley--Rice
+utilizado en la comparación. La interfaz reduce pasos de operación, pero no elimina la
+necesidad de conocimientos radioeléctricos para configurar e interpretar los resultados.
+Por tanto, la contribución se limita a un prototipo evaluado en condiciones controladas y no
+se presenta como una alternativa operacional completa a las herramientas de planificación.
 
 % ============================================================
 \section{Gemelo digital: concepto y aplicaciones en redes}
 \label{sec:gemelo}
 % ============================================================
 
-El concepto de \textit{digital twin} (gemelo digital) fue formulado por Michael Grieves
-en 2002 en el contexto de la gestión del ciclo de vida del producto (PLM) en la industria
-aeroespacial \cite{grieves2014digital}. La idea central es la de un par de entidades: el
-sistema físico real y su contraparte virtual, sincronizadas mediante un flujo de datos
-bidireccional. La réplica virtual permite simular el comportamiento del sistema en
-condiciones que sería costoso o peligroso reproducir en el mundo real, anticipar fallos
-y optimizar parámetros en tiempo prácticamente real.
+El concepto de \textit{digital twin} (gemelo digital) se asocia a los trabajos de Michael
+Grieves sobre gestión del ciclo de vida del producto (PLM). La formulación se presentó
+originalmente en 2002 y la fuente citada aquí es una publicación posterior de 2014
+\cite{grieves2014digital}. El concepto relaciona un sistema físico con su representación
+virtual y admite distintos grados de intercambio y sincronización de datos. Una réplica
+virtual puede servir para describir el sistema, explorar escenarios y, cuando se alimenta
+con medidas, contrastar y ajustar sus predicciones.
 
-Fuller et al. \cite{fuller2020digital} ofrecen la revisión sistemática más citada del
-estado del arte en gemelos digitales, con más de 2000 referencias. Distinguen tres tipos
-de gemelo según su nivel de fidelidad:
+Fuller et al. \cite{fuller2020digital} revisan tecnologías y retos de los gemelos digitales
+y describen tres tipos según su capacidad:
 \begin{itemize}
   \item \textbf{Descriptivo}: réplica estática del sistema en un instante dado
     (modelo CAD, plano de planta).
-  \item \textbf{Predictivo}: incluye un modelo dinámico que permite simular el
-    comportamiento futuro (simulación de fluidos, electromagnética).
+  \item \textbf{Predictivo}: incluye un modelo que permite estimar el comportamiento
+    futuro, por ejemplo, mediante simulación electromagnética.
   \item \textbf{Prescriptivo}: cierra el bucle entre simulación y actuación, de forma
     que el gemelo propone (o ejecuta) acciones sobre el sistema real para alcanzar un
     objetivo definido.
@@ -258,12 +268,16 @@ investigación como el de la Universidad de Oulu han propuesto gemelos digitales
 urbana para seleccionar emplazamientos de small cells con validación antes del despliegue
 físico.
 
-El gemelo digital de este TFG es de tipo \textbf{predictivo}: toma los parámetros de un
-gNodeB (frecuencia, potencia, emplazamiento, datos SRTM) y genera un mapa de RSRP
-simulado que predice la cobertura real antes de posicionar la antena física. La interfaz
-Angular visualiza esa predicción en tiempo real y permite iterar sobre los parámetros de
-configuración sin necesidad de un despliegue físico, lo que reduce drásticamente el tiempo
-de planificación táctica.
+Para describir la madurez de este proyecto se distinguen tres hitos inspirados en la
+clasificación de Fuller et al. El nivel \textbf{descriptivo}, implementado, representa los
+escenarios MATLAB precalculados mediante metadatos y mapas de RSRP. El nivel
+\textbf{predictivo interactivo}, también implementado en alcance inicial, permite variar
+parámetros desde la interfaz y solicitar una nueva predicción al motor Java mediante la API;
+este motor utiliza FSPL más difracción de Deygout sobre el terreno local y no es equivalente
+a Longley--Rice. La calibración con observaciones compatibles y la recomendación de
+emplazamientos se han ensayado con datos sintéticos como apoyos a la planificación.
+Esto no demuestra un gemelo calibrado y sincronizado con una burbuja física: el
+prototipo no recibe medidas de equipos desplegados ni actúa automáticamente sobre ellos.
 
 % ============================================================
 \section{Trabajos relacionados}
@@ -290,8 +304,8 @@ del modelo propuesto en este TFG (Cap.~\ref{cap:capitulo5}).
 
 \paragraph{Diferenciación de este TFG.} Frente a los trabajos anteriores, la contribución
 de este proyecto combina cuatro elementos que no aparecen juntos en la literatura revisada:
-(1)~integración del modelo Longley-Rice con datos SRTM de 30~m en un script MATLAB
-completamente reproducible; (2)~API REST Spring Boot como capa de servicio; (3)~visualización
+(1)~integración del modelo Longley-Rice con escenarios cuyos metadatos declaran
+\texttt{SRTM\_90m\_global}; (2)~API REST Spring Boot como capa de servicio; (3)~visualización
 Angular con heatmap interactivo y selección de punto en el mapa; y (4)~foco explícito en
 el escenario de burbuja táctica desplegable, con especial atención a la usabilidad del
 operador en campo. El código es abierto y reproducible bajo licencia MIT.
