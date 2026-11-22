@@ -153,7 +153,7 @@ cd backend
 mvn spring-boot:run
 
 # 3. Arrancar Angular (en otra terminal)
-cd mockups/mockup_v1/gemelo-digital-5g
+cd frontend
 ng serve
 
 # 4. Abrir navegador

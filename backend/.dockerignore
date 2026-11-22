@@ -1,0 +1,12 @@
+*
+!pom.xml
+!src/
+!src/**
+!demo/
+!demo/00000000-0000-4000-8000-000000000001.json
+!demo/SyntheticTerrain.java
+src/**/*.json
+src/**/*.tif
+src/**/*.tiff
+src/**/*.hgt
+src/**/*.zip
