@@ -2,30 +2,301 @@
 \chapter{Validación y Resultados}
 \label{cap:capitulo5}
 
-\section{Diseño del Escenario de Prueba}
+\section{Alcance de la evaluación}
 \label{sec:escenario}
-\textit{Campus URJC Fuenlabrada: 40.2897°N, 3.8244°W.\\
-Parámetros.}
 
-\section{Resultados de la Simulación MATLAB}
-\label{sec:resultados_matlab}
-\textit{Alcance.\\
-Variación RSRP.\\
-RSRP medio en cobertura.\\
-Validación teórica.}
+La evaluación distingue entre pruebas de software, comparación entre motores de
+propagación y validación empírica. La comprobación central de integración compara
+Java y MATLAB en perfiles sintéticos con el mismo algoritmo FSPL+Deygout y supuestos
+alineados: las diferencias observadas son inferiores a $10^{-8}$~dB. Una comparación
+histórica recalculó con Java puntos de escenarios MATLAB con hipótesis distintas; no
+se pudo repetir en esta integración sin el GeoTIFF histórico. No se dispone de una campaña de medidas de
+campo trazables para validar las predicciones frente a RSRP real; por tanto, los resultados
+de esta sección no se presentan como validación empírica.
 
-\section{Resultados de la Integración Web}
+El conjunto histórico de referencia incluye tres JSON MATLAB: \texttt{URJC\_Fuenlabrada\_Suburbano}
+(3,5~GHz), \texttt{Sierra\_Guadarrama\_Rural} (0,7~GHz) y
+\texttt{Madrid\_Centro\_Urbano} (3,5~GHz). Los tres declaran el modelo
+\texttt{Longley-Rice} y el terreno \texttt{SRTM\_90m\_global}. La prueba
+\texttt{MatlabScenarioComparisonTest} utiliza estos ficheros y el GeoTIFF local
+\texttt{srtm\_fuenlabrada.tif} para los recálculos Java de aquella ejecución. El raster
+histórico examinado medía
+$3601\times3601$ muestras, está georreferenciado en WGS~84 y declara una escala de un
+segundo de arco por píxel (resolución nominal cercana a 30~m, dependiente de la latitud).
+El fichero lleva una etiqueta SRTM, pero no se conserva una ficha de adquisición o una
+suma de verificación que permita documentar su cadena de procedencia.
+
+\paragraph{Tipo de pixel.}
+La clave GeoKey \texttt{GTRasterTypeGeoKey} del GeoTIFF histórico indicaba
+\texttt{PixelIsPoint} en el raster de $3601\times3601$ píxeles. La corrección del
+tratamiento \texttt{PixelIsArea} se cubrió con un raster sintético de $2\times3$ píxeles
+y una prueba de regresión \texttt{PixelIsPoint}; por ello, no altera el tile local ni las
+métricas históricas recogidas en el Cuadro~\ref{tab:comparacion_motores}.
+
+\section{Pruebas del software}
 \label{sec:resultados_web}
-\textit{Métricas rendimiento.\\
-Compatibilidad.\\
-Cumplimiento RNF2.}
 
-\section{Comparación con Software Comercial}
+El informe Maven de la fase~1, fechado el 21/11/2026, contabilizó 47 pruebas: 46 ejecutadas y
+una comparación Java--MATLAB optativa omitida, sin fallos ni errores. El XML JaCoCo de esa fase
+(\texttt{backend/target/site/jacoco/jacoco.xml}, generado a las 21:22) registró 409 de
+453 líneas cubiertas (90,3~\%) y 137 de 192 ramas (71,4~\%) en 26 clases de producción.
+La cobertura de código mide ejecución de instrucciones; no demuestra la exactitud
+radioeléctrica del motor.
+
+En esa fase anterior, la compilación de producción del frontend Angular terminó correctamente. Se observaron
+avisos del presupuesto de tamaño del paquete inicial y de dependencias CommonJS. Una
+prueba funcional local en navegador, con seis JSON de prueba aislados, verificó la creación
+y visualización del mapa, el borrado confirmado y cancelado, el tratamiento de JSON
+inválidos, las respuestas GET tardías o fallidas y limpiar una comparación A=B. No es una
+suite de navegador integrada en CI. Tampoco se midieron latencia de simulación, tiempo de
+carga del mapa o rendimiento con usuarios concurrentes; esos requisitos siguen pendientes
+de medición.
+
+En la validación del candidato integrado \texttt{f8ae98775c03094f593bd3dfa852a0f8577cba7c},
+Maven registró 82 casos: 79 ejecutados y superados y tres omitidos, sin fallos.
+Los casos omitidos fueron el de SRTM local, el de recomendación con raster local y
+la comparación histórica; no se consideran pruebas ejecutadas. Un control selectivo
+adicional de Java--MATLAB con perfiles sintéticos fue satisfactorio, con diferencias
+inferiores a $10^{-8}$~dB. El frontend superó siete pruebas y su compilación fue
+correcta. Las cifras de cobertura JaCoCo citadas arriba pertenecen únicamente a la
+fase~1 y no se extrapolan al candidato. En una revisión posterior se amplió la
+suite del frontend a nueve pruebas, incluidas las regresiones de importaciones
+obsoletas de calibración.
+
+\section{Comprobación sintética de FSPL y pérdidas de sistema}
+\label{sec:comprobacion_fspl_sintetica}
+
+Una revisión independiente ejecutó MATLAB 25.2.0.3150157 (R2025b Update~4) con dos
+\textit{sites} cartesianos en $[0;0;0]$ y $[1000;0;0]$~m, antenas TX y RX explícitamente
+isotrópicas, frecuencia de 3,5~GHz y \texttt{rx.SystemLoss=0}. La función \texttt{fspl}
+devolvió 103,329144109~dB. Con
+\texttt{propagationModel('freespace')}, \texttt{Map='none'} y \texttt{sigstrength}, se
+obtuvieron los resultados del Cuadro~\ref{tab:matlab_balance_sintetico}.
+
+\begin{table}[H]
+\centering
+\caption{Comprobación sintética del balance de potencia en MATLAB.}
+\label{tab:matlab_balance_sintetico}
+\small
+\begin{tabularx}{\textwidth}{|X|X|r|}
+\hline
+\textbf{Configuración TX} & \textbf{Configuración RX} & \textbf{\texttt{sigstrength} (dBm)} \\
+\hline
+53~dBm, \texttt{SystemLoss=0} & Isotrópica, \texttt{SystemLoss=0} & $-50{,}329144109$ \\
+55~dBm, \texttt{SystemLoss=2} & Isotrópica, \texttt{SystemLoss=0} & $-50{,}329144109$ \\
+\hline
+\end{tabularx}
+\end{table}
+
+La diferencia entre ambas salidas fue 0,000000000~dB. Este resultado confirma la
+consistencia del balance y la aplicación de \texttt{SystemLoss} en esa configuración
+sintética; no demuestra qué antena efectiva usaron los escenarios históricos ni corrige
+sus JSON. \texttt{sigstrength} devuelve potencia recibida total simulada: el ejercicio no
+calcula SS-RSRP y no contiene medidas de campo. Fue una única ejecución; no se modificaron
+los generadores ni los datos.
+
+Como contraste de implementación, el \texttt{PropagationEngine} Java actual se ejecutó
+con perfil sintético plano de 0~m, TX y RX a 10~m, distancia horizontal de
+1\,000{,}000000000~m, frecuencia de 3,5~GHz y balance TX de
+$40+15-2=53$~dBm. Java obtuvo FSPL de 103,329144108889~dB, difracción Deygout de 0~dB y
+un valor proxy de $-79{,}316395924784$~dBm. Como referencia, el resultado MATLAB de
+\texttt{sigstrength} ($-50{,}329144109$~dBm de potencia total) normalizado con
+$10\log_{10}(66\times12)=28{,}987251815895$~dB da
+$-79{,}316395924895$~dBm; la diferencia Java--MATLAB normalizado es
+$+1{,}11\times10^{-10}$~dB. El motor Java no expone potencia total recibida en el mismo
+formato, por lo que su valor es un proxy, no una medición ni un cálculo normativo de
+SS-RSRP según 3GPP TS~38.215~\cite{3gpp_ts38215_2022}.
+
+Este control sintético de un único enlace de línea de vista muestra concordancia numérica
+entre la implementación Java y la referencia MATLAB normalizada bajo estas hipótesis; la
+diferencia residual queda por debajo de la resolución publicada de la salida MATLAB y no
+debe interpretarse como precisión significativa. El caso no permite atribuir ni descartar
+causas para los RMSE históricos. Las diferencias de configuración de antena y potencia,
+normalización por banda, terreno, modelo Longley--Rice y filtrado de puntos son hipótesis
+que habría que aislar, no causas probadas por este control. Tampoco se validan la antena
+efectiva de los JSON históricos, un terreno real ni predicciones con medidas de campo.
+
+\section{Comparación entre los motores Java y MATLAB}
 \label{sec:comparativa}
-\textit{Tabla comparativa Xirio Online vs TFG.\\
-Conclusión.}
 
-\section{Limitaciones Identificadas}
+El motor Java calcula FSPL más difracción de Deygout sobre el perfil de elevación del
+GeoTIFF local. En la ejecución histórica, para cada punto guardado en un JSON MATLAB,
+el test volvió a calcular Java
+en las mismas coordenadas y acumula la diferencia
+$\Delta=\mathrm{RSRP}_{Java}-\mathrm{RSRP}_{MATLAB}$. Se informa el sesgo medio con signo
+y la raíz del error cuadrático medio (RMSE), en dB. Los puntos que el motor no puede
+evaluar por quedar fuera de la cobertura del raster local se excluyen y se cuentan por
+separado.
+
+\begin{table}[H]
+\centering
+\caption{Comparación histórica entre el motor Java y los escenarios MATLAB almacenados.}
+\label{tab:comparacion_motores}
+\small
+\begin{tabularx}{\textwidth}{|X|r|r|r|r|}
+\hline
+\textbf{Escenario de referencia} & \textbf{Pares} & \textbf{Excluidos} &
+\textbf{Sesgo medio (dB)} & \textbf{RMSE (dB)} \\
+\hline
+\texttt{Sierra\_Guadarrama\_Rural} & 3168 & 1683 & 12,389 & 19,830 \\
+\texttt{URJC\_Fuenlabrada\_Suburbano} & 3598 & 0 & 7,866 & 12,242 \\
+\texttt{Madrid\_Centro\_Urbano} & 2451 & 0 & -3,938 & 16,463 \\
+\hline
+\end{tabularx}
+\end{table}
+
+Los valores corresponden a una ejecución anterior, no repetida en la integración
+actual por falta del GeoTIFF histórico. Muestran diferencias notables entre las
+salidas de ambos motores: el sesgo
+cambia de signo entre escenarios y los RMSE observados se sitúan entre 12,242 y
+19,830~dB. El mayor número de exclusiones se produce en el escenario de la Sierra. La
+prueba histórica identificó puntos que el motor no podía evaluar por la cobertura del raster
+local; con el GeoTIFF examinado, que no declara celdas NoData, se atribuyen a ubicaciones
+fuera de su extensión. Sin embargo, la revisión independiente ha señalado que debe
+reconciliarse el tratamiento de puntos excluidos antes y después de exportar los escenarios;
+esa equivalencia sigue bajo revisión y no se da por resuelta aquí. La prueba histórica
+exigía al menos un punto evaluable y registraba métricas, sin definir un umbral de
+aceptación; el procedimiento integrado actual añade tratamiento de valores recortados,
+por lo que sus cifras no deben identificarse con las de esta tabla sin repetirlo.
+
+Esta comparación no aísla el efecto de los modelos. Los JSON MATLAB declaran
+\texttt{SRTM\_90m\_global}, mientras que Java utiliza el GeoTIFF local de un segundo de
+arco; además, Longley--Rice y FSPL+Deygout son algoritmos distintos. También hay diferencias
+nominales en el balance de potencia: MATLAB pasa $P_{tx}$ al modelo sin sumar ganancia de
+antena ni restar pérdidas de cable, mientras Java usa EIRP; el desplazamiento nominal es
+13~dB en URJC y Madrid y 16~dB en Sierra. Para Sierra a 700~MHz, los factores heredados son 52$\times$12 en MATLAB
+(aproximadamente 27,96~dB) y 66$\times$12 en Java (28,99~dB), con una diferencia cercana a
+1,03~dB. No representan una configuración documentada de ancho de banda o SCS. En el código
+actual, Java construye una rejilla inclusiva con
+$\lceil\text{área}/\text{paso solicitado}\rceil+1$ puntos por eje y guarda los pasos
+solicitado y efectivo; el generador MATLAB calcula el paso efectivo como
+$\text{área}/(n_\text{puntos}-1)$ y lo incluye en sus metadatos. Sin embargo, los JSON
+históricos usados en esta comparación no se regeneraron, por lo que no incorporan estas
+correcciones del generador ni constituyen una nueva comparación con artefactos armonizados.
+Siguen pendientes de reconciliación el terreno efectivo y el filtrado de puntos antes y
+después de exportar los escenarios. No se consideran resueltos esos límites ni se atribuye
+el RMSE exclusivamente al modelo. Los valores siguen siendo una comparación entre
+simulaciones, no una validación con mediciones de campo ni una prueba de conformidad del
+estándar.
+
+\section{Limitaciones identificadas}
 \label{sec:limitaciones}
-\textit{Modelo propagación: no obstáculos 3D, limitado en urbano denso, no caso indoor.\\
-Implementación: simulación offline, no optimizado para número de usuarios, sin persistencia DB, sin autenticación.}
+
+\begin{itemize}
+  \item \textbf{Modelos no equivalentes}: los escenarios históricos MATLAB usan
+    Longley--Rice y Java combina FSPL con difracción de Deygout. La fase~1 no modela
+    edificios, reflexiones urbanas, interiores, patrones de antena ni interferencia; las
+    extensiones locales posteriores no suplen todos estos fenómenos.
+  \item \textbf{Alcance de un nodo}: esta revisión se centra en una antena y en su
+    cobertura estimada; la validación empírica sigue pendiente.
+  \item \textbf{Terreno}: el raster local presenta tags WGS~84 y escala de un segundo
+    de arco; no se dispone de metadatos de adquisición para certificar su procedencia.
+    Los JSON MATLAB conservan su propia declaración
+    \texttt{SRTM\_90m\_global}, que no se debe sustituir por la etiqueta Java.
+  \item \textbf{Límites de cobertura}: el backend consulta la extensión del raster y rechaza
+    perfiles fuera de ella o con elevación no válida; la interfaz muestra avisos basados en
+    la extensión y el área solicitada. La comprobación de la interfaz es parcial y no se
+    presenta como una gestión completa de límites geográficos.
+  \item \textbf{Historial}: el borrado confirmado, la comprobación de identidad del JSON y
+    la reconciliación de selecciones están cubiertos por pruebas automatizadas y una prueba
+    funcional local en navegador. No se dispone de una suite de navegador en CI. La
+    persistencia se basa en ficheros, sin base de datos ni historial versionado
+    completo. Los resultados de calibración vinculan las observaciones compatibles
+    con el identificador de simulación y el hash de la predicción, y conservan
+    las observaciones originales; esto no acredita una campaña de medidas reales.
+  \item \textbf{Cartografía}: el catálogo activo ofrece tres fuentes raster externas. La
+    integración PMTiles no tiene un tema activo y no se ha verificado el uso sin conexión.
+  \item \textbf{Validación y rendimiento}: no se han incorporado medidas de campo; tampoco
+    se han medido tiempos de simulación, carga del mapa, escalabilidad o usabilidad con
+    usuarios. El test de comparación no fija un criterio de error aceptable.
+\end{itemize}
+
+En consecuencia, el prototipo alcanza los niveles descriptivo y predictivo interactivo de
+la burbuja virtual, pero todavía no está sincronizado ni calibrado con una burbuja física.
+El avance verificable consiste en generar, almacenar, consultar y representar predicciones
+con dos motores diferenciados, con límites y precisión que deben interpretarse según las
+evidencias expuestas.
+
+\section{Avances locales posteriores a la fase 1}
+\label{sec:avances_posteriores}
+
+Esta sección recoge pruebas locales posteriores a la fase~1, incluida una integración
+anterior identificada por el árbol Git \texttt{71df5ad5c1cce8d9c65863b1ce46a0cac121f018},
+el árbol reorganizado \texttt{08d3a7e6fff368e7cd392e465c272c67ca88660d} y el
+candidato integrado validado en la Sección~\ref{sec:resultados_web}.
+Las cifras de pruebas y cobertura de la sección anterior corresponden a la fase~1,
+salvo donde se identifica expresamente el candidato integrado.
+
+Los ejemplos numéricos de las capacidades de apoyo en esta sección proceden de una
+integración local anterior y no se atribuyen a una nueva ejecución del candidato.
+Estas comprobaciones no establecen precisión frente a medidas de campo.
+
+\paragraph{Recorrido integrado en navegador.}
+En la integración reorganizada se comprobó el recorrido real del navegador para
+colocar la antena, solicitar una simulación persistida y visualizar la cobertura,
+utilizando un GeoTIFF y datos sintéticos aislados. No se utilizaron medidas de
+campo ni se acredita con ello precisión del modelo en un entorno real.
+
+\paragraph{Comparación controlada Java--MATLAB.}
+Además del contraste histórico de la Sección~\ref{sec:comparativa}, se ensayaron perfiles
+sintéticos plano y con cresta con el mismo algoritmo FSPL+Deygout y supuestos alineados
+en ambas implementaciones. El control Java utilizó un JSON sintético generado previamente
+por MATLAB; no se ejecutó MATLAB de nuevo para aquella comprobación. En la integración
+reorganizada se comprobó también el contraste sintético con diferencia inferior a
+$10^{-8}$~dB. Los proxies anteriores obtenidos fueron aproximadamente
+$-79{,}316395925$ y $-111{,}418102426$~dBm, respectivamente, con diferencias inferiores
+a $10^{-8}$~dB entre implementaciones. El control comprueba concordancia numérica para
+esos perfiles, no independencia de modelos, exactitud en terreno real ni validación
+frente a campo; no elimina las discrepancias de los escenarios históricos.
+
+\paragraph{Calibración sintética.}
+Se probó un ajuste con datos sintéticos, separando el conjunto usado para ajustar del
+conjunto de reserva utilizado para evaluar. El emparejamiento utiliza el punto de rejilla
+más cercano dentro del dominio y a una distancia máxima de $0{,}75$ veces el espaciado,
+limitada a 100~m; se descartan puntos de reserva compartidos con el ajuste. El
+desplazamiento es la media de observación menos predicción en el conjunto de ajuste.
+En un ejemplo sintético, el desplazamiento obtenido fue $+3$~dB y, en la reserva, el
+sesgo pasó de $-3$ a $0$~dB y el RMSE de 3,109126 a 0,816497~dB. Es una comprobación
+del procedimiento, no una demostración de mejora sobre mediciones reales ni de
+generalización. La calibración ajusta el \textit{proxy} de potencia guardado, no SS-RSRP
+físicamente equivalente.
+
+\paragraph{Recomendación de emplazamientos.}
+Un prototipo local prueba una selección voraz (\textit{greedy}) explicable sobre rejillas
+acotadas para un área cuadrada o un polígono simple dibujado, incluidos polígonos
+cóncavos. En el caso poligonal se calculan rejillas sobre su envolvente y se conservan
+los candidatos y objetivos interiores o en el contorno. Cada paso elige el candidato
+que aporta más objetivos todavía no cubiertos. Se rechazan geometrías inválidas y se
+limita el coste antes de calcular. La cobertura se refiere a puntos de la rejilla, no a
+superficie continua. La recomendación usa antenas isotrópicas y no incorpora el patrón
+direccional ni el \textit{clutter} manual.
+
+En un ensayo simulado cuadrado con una tesela local se cubrieron 64 de 64 objetivos
+con un nodo. En otro ensayo local, el dibujo y cálculo de un polígono en navegador
+produjo 10 candidatos, 36 objetivos y 360 enlaces evaluados; un nodo cubrió los 36
+objetivos. Estos casos no prueban un óptimo global ni rendimiento general en otros
+escenarios. La evaluación completa de sus interacciones sigue pendiente.
+
+\paragraph{Complementos radioeléctricos.}
+Se probaron un patrón direccional opcional por transmisor, una pérdida de
+\textit{clutter} introducida manualmente y la representación de un perfil con primera
+zona de Fresnel.
+Las pruebas radioeléctricas emplearon terreno sintético; el \textit{clutter} manual no
+es un mapa de usos del suelo y no se verificó el perfil con un raster real. La
+integración local posterior no acredita por sí misma la precisión de las predicciones.
+
+\paragraph{Empaquetado local.}
+Una prueba anterior con un GeoTIFF sintético devolvió indebidamente
+\texttt{terrain\_data=SRTM\_30m\_local}. En el código integrado la etiqueta por
+defecto es genérica y Compose configura explícitamente la procedencia sintética.
+Se comprobó la configuración de Docker Compose, pero no se pudieron construir ni
+ejecutar los contenedores por falta de espacio: la demo contenerizada y su
+verificación visual siguen pendientes.
+
+\paragraph{Comprobaciones pendientes.}
+Quedan por confirmar la cobertura de pruebas del candidato y la reproducción de los
+experimentos anteriores sobre el conjunto definitivo. Faltan la demo
+Docker contenerizada, la evaluación completa de interacciones, la comparación histórica
+con el raster original y una campaña de medidas de campo trazables con criterios de
+aceptación. No se asigna a estas tareas un
+resultado hasta ejecutarlas.

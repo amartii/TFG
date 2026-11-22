@@ -100,9 +100,9 @@ cd "TFG GD5G"
 make pdf
 ```
 
-### Cartografía vectorial offline (opcional)
+### Preparación de cartografía vectorial (opcional)
 
-Para servir los tiles del mapa desde un fichero local (sin depender del CDN de Protomaps):
+El script opcional prepara un fichero PMTiles local:
 
 ```powershell
 cd frontend
@@ -111,7 +111,10 @@ pwsh ./scripts/download-pmtiles.ps1
 
 El script intenta primero un *extract* optimizado de la Península Ibérica (~25–50 MB) usando la CLI oficial [`pmtiles`](https://github.com/protomaps/go-pmtiles/releases). Si esa CLI no está instalada, ofrece descargar el `v4.pmtiles` mundial completo de Protomaps (>1 GB), opción solo recomendable si se necesita cobertura mundial sin conexión.
 
-El fichero queda en `src/assets/tiles/spain.pmtiles` y el frontend lo detecta automáticamente.
+El fichero queda en `src/assets/tiles/spain.pmtiles`. El frontend incluye código
+para PMTiles, pero actualmente no ofrece ningún tema vectorial en su catálogo:
+descargarlo no activa cartografía offline. Los tres temas disponibles usan
+servicios raster externos.
 
 ### Simulación bajo demanda
 

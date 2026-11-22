@@ -8,11 +8,13 @@
 \subsection{Visión general del motor de simulación}
 \label{sec:matlab_vision}
 
-La simulación radioeléctrica vive en dos ficheros: el script principal
-\texttt{simulacion\_cobertura\_5g.m} y la función \texttt{exportar\_json.m}, que se ocupa
-de serializar la salida. Entre los dos calculan el mapa de cobertura de un \textit{gNodeB}
-5G NR sobre una cuadrícula de $3 \times 3$~km y lo exportan en JSON para que el backend
-Spring Boot lo sirva sin ningún paso intermedio manual.
+La simulación radioeléctrica dispone de dos motores con funciones diferentes. El script
+MATLAB \texttt{simulacion\_cobertura\_5g.m}, junto con
+\texttt{exportar\_json.m}, genera los escenarios de referencia con Longley--Rice o con
+el \textit{fallback} disponible en MATLAB. Para las nuevas peticiones web, el backend
+Spring Boot ejecuta un motor Java FSPL+Deygout y guarda también la salida en JSON. Los
+resultados de ambos motores comparten el propósito de visualizar RSRP, pero no son
+intercambiables ni utilizan necesariamente el mismo modelo o terreno.
 
 Decidimos dividir el script en nueve bloques ejecutables de forma independiente porque
 durante el desarrollo fue clave poder validar cada paso por separado antes de encadenarlos.
@@ -35,7 +37,7 @@ El Cuadro~\ref{tab:bloques_matlab} los resume.
 5 & Cálculo del RSRP            & Convierte $P_{rx}$ a RSRP según 3GPP TS 38.215 \\
 6 & Visualización               & Genera \textit{heatmaps} y estadísticas de cobertura \\
 7 & Exportación a JSON          & Serializa los resultados para el backend \\
-8 & Validación con FSPL         & Comprueba coherencia con la cota teórica \\
+8 & Prueba de referencia FSPL  & Comprueba casos teóricos bajo hipótesis de espacio libre \\
 \hline
 \end{tabularx}
 \end{table}
@@ -51,8 +53,8 @@ Todos los parámetros configurables están agrupados al inicio del script para q
 lanzar distintos escenarios sin buscar constantes dispersas por el código. El escenario de
 referencia modela un \textit{gNodeB} típico de la banda FR1 n78 (3,4--3,8~GHz), que es
 la banda de despliegue masivo de 5G en Europa, emplazado en el edificio de Rectorado del
-campus URJC de Fuenlabrada. Los valores del Cuadro~\ref{tab:params_antena} son representativos
-de una instalación real en azotea, no teóricos.
+campus URJC de Fuenlabrada. Los valores del Cuadro~\ref{tab:params_antena} son los parámetros adoptados para este
+escenario de referencia; no se presentan como una instalación desplegada y medida.
 
 \begin{table}[H]
 \centering
@@ -82,10 +84,11 @@ Con estos valores, la EIRP queda en:
 \label{eq:eirp}
 \end{equation}
 
-Para la cuadrícula optamos por 50~m de espaciado como compromiso entre resolución y tiempo
-de cómputo: con 3~km de lado obtenemos $60 \times 60 = 3600$ puntos, suficientes para ver
-gradientes a escala de manzana, y el cálculo Longley-Rice completo tarda unos 60~s en un
-portátil de gama media.
+En el escenario MATLAB de referencia, el área tiene 3~km de lado y se generan
+$60 \times 60 = 3600$ puntos. Al incluir ambos extremos, el paso efectivo es
+$3000/(60-1)\approx 50{,}85$~m. El generador actual persiste ese valor efectivo en el JSON;
+los ficheros históricos ya existentes no se regeneraron. Esta configuración es una
+elección de muestreo; no se atribuye un tiempo de ejecución sin una medición reproducible.
 
 \begin{lstlisting}[language=MATLAB, caption={Parámetros de configuración de la simulación (Bloque 1).}, label={cod:bloque1}]
 fc_Hz       = 3.5e9;        % Frecuencia central [Hz] - banda n78
@@ -100,8 +103,8 @@ EIRP_dBm    = Ptx_dBm + Gtx_dBi - L_cable_dB;
 
 lat0 = 40.2897;   lon0 = -3.8244;   % Campus URJC Fuenlabrada
 areaKm        = 3;       % Lado del área cuadrada [km]
-gridSpacing_m = 50;      % Espaciado de la cuadrícula [m]
-nPuntos       = areaKm * 1000 / gridSpacing_m;  % 60
+nPuntos       = 60;      % Muestras por eje, incluidos ambos extremos
+gridSpacing_m = areaKm * 1000 / (nPuntos - 1);  % paso efectivo: aprox. 50.85 m
 \end{lstlisting}
 
 \subsection{Generación de la cuadrícula de receptores (Bloque 2)}
@@ -117,8 +120,8 @@ medias:
 \label{eq:deltas}
 \end{equation}
 
-donde $a = 3$~km. El error que introduce esta aproximación en la zona de Fuenlabrada
-($\phi_0 \approx 40^\circ$) es menor del 0,1~\%, perfectamente asumible para nuestro propósito.
+donde $a = 3$~km. La conversión es una aproximación local adecuada para delimitar el área de este escenario;
+no sustituye una proyección cartográfica ni se le atribuye una cota de error medida.
 
 Con \texttt{linspace} construimos los vectores de coordenadas y con \texttt{meshgrid}
 la cuadrícula 2D. Después aplanamos las matrices \texttt{LATS} y \texttt{LONS} a vectores
@@ -139,10 +142,17 @@ lons_flat = LONS(:);
 \subsection{Datos de elevación del terreno (Bloque 3)}
 \label{sec:matlab_srtm}
 
-Los datos de elevación vienen del SRTM (NASA/USGS). Elegimos el \textit{tile}
-\texttt{N40W004} porque cubre el área de Fuenlabrada con 30~m de resolución y se descarga
-gratis desde USGS EarthExplorer en formato GeoTIFF. Almacenamos el fichero en
-\texttt{matlab/data/srtm\_fuenlabrada.tif} para tenerlo junto al script.
+Los escenarios MATLAB existentes declaran \texttt{SRTM\_90m\_global} en sus metadatos.
+Aunque el script puede leer un GeoTIFF local y trata de configurarlo en
+\texttt{siteviewer}, esa posibilidad no demuestra que se utilizara en las salidas
+almacenadas. El backend Java lee \texttt{matlab/data/srtm\_fuenlabrada.tif}; sus tags
+GeoTIFF indican WGS~84, una escala angular de un segundo de arco
+($0{,}00027778^\circ$ por píxel) y un raster de $3601\times3601$ muestras. Esta resolución
+nominal equivale aproximadamente a 31~m en latitud y varía en longitud. El nombre del
+fichero sugiere SRTM, pero
+no se conserva una ficha de descarga, proveedor comprobable ni suma de verificación para
+establecer su procedencia documental. Las pruebas confirman que el fichero se puede leer,
+que su extensión se expone y que se rechazan coordenadas exteriores.
 
 Para interpolar la elevación en cada punto de la cuadrícula usamos \texttt{readgeoraster}
 y \texttt{geointerp} del \textit{Mapping Toolbox}:
@@ -171,8 +181,8 @@ instalados y selecciona el mejor disponible automáticamente.
 \label{sec:matlab_lr}
 
 Elegimos el \textit{Irregular Terrain Model} (ITM) o modelo Longley-Rice
-\cite{longley1968transmission} como modelo principal porque es el único de los disponibles
-en MATLAB que incorpora el perfil real del terreno en el cálculo de pérdidas. A diferencia
+\cite{longley1968transmission} como motor de referencia de los escenarios MATLAB por su
+incorporación del perfil del terreno en el cálculo de pérdidas. A diferencia
 de los modelos puramente empíricos, evalúa la difracción sobre las irregularidades del
 terreno (parametrizada por $\Delta h$), la reflexión en el suelo y la curvatura de la
 Tierra para cada enlace TX-RX individual. Para redes desplegables en entornos con orografía
@@ -197,23 +207,26 @@ rx_sites = rxsite('Latitude',      lats_flat, ...
 Prx_dBm = sigstrength(rx_sites, tx, pm);
 \end{lstlisting}
 
-\texttt{sigstrength} devuelve $P_{rx}$ en dBm para cada receptor usando internamente un
-MDT SRTM a 90~m de resolución que el \textit{toolbox} lleva de serie. Cuando cargamos nuestro
-tile local de 30~m a través de un \texttt{siteviewer}, ese MDT global queda sustituido y
-la precisión en la zona de estudio mejora notablemente. Integrar el tile propio es, de hecho,
-la mejora técnica central de este TFG frente a usar el modelo con su terreno por defecto.
+\texttt{sigstrength} devuelve $P_{rx}$ en dBm para cada receptor. El script intenta
+configurar un terreno local mediante las interfaces de \texttt{rfprop.TerrainModel} o
+\texttt{siteviewer}; si fallan, utiliza el terreno global de MATLAB y registra
+\texttt{SRTM\_90m\_global}. Los tres JSON de referencia disponibles declaran esta última
+fuente. En consecuencia, no se atribuye a esas simulaciones el uso efectivo del GeoTIFF
+local ni una mejora de precisión derivada de una resolución de 30~m.
 
 \subsubsection{COST-231 Hata como modelo de respaldo}
 \label{sec:matlab_cost231}
 
-Cuando el \textit{Communications Toolbox} no está instalado, el script cae en COST-231 Hata
-extendido \cite{cost231finalreport1999}. Es un modelo de bolsillo: solo necesita las
-funciones matemáticas básicas de MATLAB y el cálculo es casi instantáneo. La fórmula de
+Cuando el \textit{Communications Toolbox} no está instalado, el script recurre a COST-231
+Hata extendido~\cite{cost231finalreport1999}. Este modelo solo necesita funciones
+matemáticas básicas de MATLAB. La fórmula de
 pérdidas para entorno urbano medio ($C_m = 3$~dB) es:
 
 \begin{equation}
-L_{50}~[\text{dB}] = 46{,}3 + 33{,}9 \log_{10}f_c - 13{,}82 \log_{10}h_{Tx}
-                   - a(h_{Rx}) + (44{,}9 - 6{,}55 \log_{10}h_{Tx})\log_{10}d + C_m
+\begin{split}
+L_{50}~[\text{dB}] ={}& 46{,}3 + 33{,}9 \log_{10}f_c - 13{,}82 \log_{10}h_{Tx} \\
+                      &- a(h_{Rx}) + (44{,}9 - 6{,}55 \log_{10}h_{Tx})\log_{10}d + C_m
+\end{split}
 \label{eq:cost231}
 \end{equation}
 
@@ -226,62 +239,70 @@ a(h_{Rx}) = (1{,}1 \log_{10}f_c - 0{,}7)\,h_{Rx} - (1{,}56 \log_{10}f_c - 0{,}8)
 
 De ahí, $P_{rx} = \text{EIRP} + G_{rx} - L_{50}$.
 
-El problema es que COST-231 Hata fue calibrado para 1500--2000~MHz. A 3,5~GHz se empieza
-a quedar corto: según la literatura introduce entre 2 y 4~dB de error extra respecto a
-medidas reales, lo que en términos de cobertura puede suponer 100--200~m de diferencia en
-el borde de celda. Por eso lo usamos solo como respaldo, no como resultado.
+El problema es que COST-231 Hata fue desarrollado para frecuencias de hasta 2000~MHz.
+Su aplicación a 3,5~GHz queda fuera de ese rango, por lo que el resultado de ese
+\textit{fallback} no se presenta como predicción cuantitativamente validada.
 
 \subsubsection{FSPL como referencia teórica}
 \label{sec:matlab_fspl}
 
-Sea cual sea el modelo activo, siempre calculamos también el FSPL (\textit{Free Space
-Path Loss}) como cota superior teórica:
+Sea cual sea el modelo activo, también calculamos FSPL (\textit{Free Space Path Loss})
+como referencia teórica de propagación en espacio libre:
 
 \begin{equation}
 \text{FSPL}~[\text{dB}] = 20\log_{10}d + 20\log_{10}f_c + 20\log_{10}\!\left(\frac{4\pi}{c}\right)
 \label{eq:fspl}
 \end{equation}
 
-donde $d$ está en metros y $f_c$ en Hz. La diferencia entre el FSPL y el modelo activo
-cuantifica directamente el efecto del terreno y del entorno sobre la propagación. Esta
-comparación la visualizamos en el bloque 8 y sirve de base para la figura de la
-el Capítulo~\ref{cap:capitulo5}.
+donde $d$ está en metros y $f_c$ en Hz. La diferencia respecto al modelo activo refleja
+las hipótesis adicionales de este último y no aísla por sí sola el efecto del terreno.
+Esta comparación se calcula en el bloque 8.
 
 \subsection{Cálculo del RSRP (Bloque 5)}
 \label{sec:matlab_rsrp}
 
-$P_{rx}$ representa la potencia total integrada sobre todo el ancho de banda del canal,
-pero lo que miden los terminales 5G NR es el RSRP (\textit{Reference Signal Received
-Power}): la potencia promedio en los \textit{Resource Elements} que transportan el
-\textit{Synchronization Signal Block}, según 3GPP TS 38.215. Para pasar de una magnitud
-a la otra hay que normalizar por el número de RE del canal:
+$P_{rx}$ representa la potencia total integrada sobre todo el ancho de banda del canal.
+Para SS-RSRP, 3GPP TS~38.215 define la media lineal de las contribuciones de potencia de
+los \textit{Resource Elements} que transportan el \textit{Secondary Synchronization Signal}
+dentro del ancho de banda de medida \cite{3gpp_ts38215_2022}. El cálculo de este prototipo
+no reproduce una medición de terminal: estima RSRP a partir de $P_{rx}$ suponiendo una
+distribución uniforme de potencia entre los RE considerados, mediante la normalización
+siguiente:
 
 \begin{equation}
 \text{RSRP}~[\text{dBm}] = P_{rx}~[\text{dBm}] - 10\log_{10}(N_{RB} \cdot 12)
 \label{eq:rsrp}
 \end{equation}
 
-donde el factor 12 es el número de subportadoras por \textit{Resource Block}. Para n78
-con 100~MHz de ancho de banda y SCS de 30~kHz, 3GPP TS 38.104 fija $N_{RB} = 66$, así
-que la corrección vale:
+donde el factor 12 es el número de subportadoras por \textit{Resource Block}. El generador
+MATLAB conserva factores de normalización heredados: usa 66 para frecuencias de al menos
+3~GHz y 52 por debajo. Como los escenarios no especifican ancho de banda ni SCS, estos
+factores no se interpretan como recursos asignados ni como una configuración normalizada
+de 100~MHz/30~kHz. Para el factor 66, la corrección es:
 
 \begin{equation}
-\Delta_{\text{RSRP}} = 10\log_{10}(66 \times 12) = 10\log_{10}(792) \approx 29{,}8~\text{dB}
+\Delta_{\text{RSRP}} = 10\log_{10}(66 \times 12) = 10\log_{10}(792) \approx 28{,}99~\text{dB}
 \label{eq:delta_rsrp}
 \end{equation}
 
-Los valores resultantes se clampean al rango $[-140, -40]$~dBm y se reconstruyen en
-matriz $60 \times 60$ para visualización y exportación. En el Cuadro~\ref{tab:rsrp_umbrales}
-recogemos los umbrales de clasificación que usamos en el \textit{heatmap}, extraídos de
-los criterios de KPI de 3GPP para 5G NR.
+Los valores estimados se limitan al rango $[-140, -40]$~dBm y se reconstruyen en
+matriz $60 \times 60$ para visualización y exportación. TS~38.133, apartado~10.1.6, especifica
+un mapeo de mediciones RSRP a valores de informe \cite{etsi_ts138133_v153400_2026}; los
+intervalos del Cuadro~\ref{tab:rsrp_umbrales} son, en cambio, umbrales visuales elegidos
+por el prototipo. No son las categorías de ese mapeo ni permiten inferir por sí solos
+calidad universal o garantía de servicio.
 
 \begin{lstlisting}[language=MATLAB, caption={Cálculo del RSRP a partir de $P_{rx}$ (Bloque 5).}, label={cod:bloque5}]
-NRB_100MHz = 66;           % Resource Blocks para 100 MHz, SCS=30 kHz
-delta_RSRP_dB = 10 * log10(NRB_100MHz * 12);  % aprox 29.0 dB
+if fc_Hz >= 3e9
+    NRB_ASSUMED = 66;
+else
+    NRB_ASSUMED = 52;
+end
+delta_RSRP_dB = 10 * log10(NRB_ASSUMED * 12);
 
 RSRP_dBm = Prx_dBm - delta_RSRP_dB;
 
-RSRP_min = -140;  RSRP_max = -40;           % Límites físicos
+RSRP_min = -140;  RSRP_max = -40;           % Límites de salida configurados
 RSRP_dBm = max(min(RSRP_dBm, RSRP_max), RSRP_min);
 
 RSRP_grid = reshape(RSRP_dBm, nPuntos, nPuntos);
@@ -289,17 +310,17 @@ RSRP_grid = reshape(RSRP_dBm, nPuntos, nPuntos);
 
 \begin{table}[H]
 \centering
-\caption{Clasificación de la cobertura en función del RSRP (3GPP).}
+\caption{Intervalos visuales de RSRP adoptados por el prototipo.}
 \label{tab:rsrp_umbrales}
 \begin{tabular}{|l|c|l|}
 \hline
-\textbf{Categoría} & \textbf{Rango RSRP} & \textbf{Descripción} \\
+\textbf{Etiqueta visual} & \textbf{Rango RSRP} & \textbf{Descripción orientativa} \\
 \hline
-Excelente     & $\geq -80$~dBm          & Muy buena calidad, velocidades máximas \\
-Buena         & $[-90, -80)$~dBm        & Calidad adecuada para todos los servicios \\
-Aceptable     & $[-100, -90)$~dBm       & Cobertura funcional, velocidades reducidas \\
-Débil         & $[-110, -100)$~dBm      & Cobertura marginal, posibles cortes \\
-Sin cobertura & $< -110$~dBm            & Señal insuficiente para establecer conexión \\
+Muy alto      & $\geq -80$~dBm          & Extremo superior de la escala visual \\
+Alto          & $[-90, -80)$~dBm        & Nivel superior respecto a los intervalos siguientes \\
+Intermedio    & $[-100, -90)$~dBm       & Nivel intermedio de la escala visual \\
+Bajo          & $[-110, -100)$~dBm      & Nivel inferior de la escala visual \\
+Muy bajo      & $< -110$~dBm            & Extremo inferior de la escala visual \\
 \hline
 \end{tabular}
 \end{table}
@@ -327,7 +348,7 @@ transformaciones intermedias:
     "antenna_height_m": 30,
     "tx_location": { "latitude": 40.2897, "longitude": -3.8244 },
     "model": "Longley-Rice",
-    "terrain_data": "SRTM_30m"
+    "terrain_data": "SRTM_90m_global"
   },
   "coveragePoints": [
     { "lat": 40.2764, "lng": -3.8356, "rsrp": -97.4 },
@@ -336,15 +357,13 @@ transformaciones intermedias:
 }
 \end{lstlisting}
 
-El array \texttt{coveragePoints} solo incluye los puntos con RSRP superior a $-130$~dBm;
-los puntos por debajo de ese umbral no aportan información útil al \textit{heatmap} y
-engordan el fichero innecesariamente. Para la cuadrícula de 3600 puntos del escenario URJC,
-el JSON resultante ocupa entre 300 y 500~KB según cuántos puntos queden fuera del umbral.
+El array \texttt{coveragePoints} solo incluye los puntos con RSRP superior a $-130$~dBm.
+El motor Java aplica el mismo umbral de exportación. Por tanto, el número de puntos
+serializados puede ser inferior al total de muestras de la cuadrícula.
 
 El Listado~\ref{cod:exportar_json} muestra el núcleo de la función
-\texttt{exportar\_json.m}: la generación del UUID, la construcción de la estructura
-y la serialización. La función valida las entradas, genera la marca de tiempo en
-formato ISO~8601 con zona horaria UTC y escribe el fichero en la carpeta
+\texttt{exportar\_json.m}: la generación del UUID, la construcción de la estructura,
+la marca de tiempo ISO~8601 en UTC y la serialización en la carpeta
 \texttt{matlab/output/}.
 
 \begin{lstlisting}[language=MATLAB, caption={Fragmento principal de \texttt{exportar\_json.m}.}, label={cod:exportar_json}]
@@ -381,11 +400,12 @@ end
 \section{Backend: API REST con Spring Boot}
 \label{sec:impl_backend}
 
-El backend tiene una única responsabilidad: exponer los ficheros JSON generados por
-MATLAB como recursos accesibles vía HTTP para que el frontend pueda consumirlos. Para
-ello se diseñó una API REST sin estado (\textit{stateless}) con Spring Boot~3.2.4 y
+El backend expone los ficheros JSON existentes y genera nuevas simulaciones bajo demanda
+para que el frontend pueda consumirlas. La API REST se implementa con Spring Boot~3.2.4 y
 Java~17, empaquetada como un JAR ejecutable que no requiere servidor de aplicaciones
-externo.
+externo. Las peticiones de consulta no mantienen estado de sesión; la creación, en cambio,
+es una operación \texttt{POST} que persiste una nueva salida JSON en el directorio
+configurado.
 
 \subsection{Estructura del proyecto}
 \label{sec:backend_estructura}
@@ -403,7 +423,7 @@ El código Java se organiza en cinco paquetes siguiendo el patrón clásico de c
 \centering
 \caption{Estructura de paquetes del backend.}
 \label{tab:backend_paquetes}
-\begin{tabular}{|l|l|}
+\begin{tabularx}{\textwidth}{|l|X|}
 \hline
 \textbf{Paquete} & \textbf{Responsabilidad} \\
 \hline
@@ -413,12 +433,25 @@ El código Java se organiza en cinco paquetes siguiendo el patrón clásico de c
 \texttt{exception}  & Excepciones de dominio y manejador global \\
 \texttt{config}     & Configuración CORS para desarrollo local \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 La clase de arranque \texttt{Gemelo5gApplication} es un \texttt{@SpringBootApplication}
 estándar que delega en \texttt{SpringApplication.run()} el escaneo de componentes y la
 configuración automática del contenedor.
+
+El \texttt{SidebarComponent} muestra el histórico de simulaciones y ofrece una acción de
+borrado con confirmación explícita. Tras confirmarla, el frontend envía
+\texttt{DELETE /api/simulations/\{id\}}; el backend comprueba la identidad entre el UUID
+solicitado y el contenido del JSON antes de eliminarlo, y responde con conflicto si no
+coinciden. En caso de éxito, el frontend retira la entrada, conserva la selección activa
+si sigue disponible o selecciona otra, y limpia el punto seleccionado. En comparación,
+\texttt{ComparisonService} reconcilia B tras el borrado, impide que una respuesta tardía
+de una carga anterior restaure una selección obsoleta y no permite comparar A consigo
+misma. La colocación de un transmisor queda desactivada durante la comparación. Estas
+transiciones están cubiertas por pruebas automatizadas y por la verificación funcional
+local en navegador descrita en el Capítulo~\ref{cap:capitulo5}; no se dispone de una suite
+de navegador integrada en CI.
 
 \subsection{Servicio de simulaciones}
 \label{sec:backend_service}
@@ -436,7 +469,8 @@ sistema de ficheros, el método \texttt{getById} valida que el identificador rec
 sea un UUID~v4 conforme a RFC~4122 mediante la expresión regular:
 
 \begin{center}
-\texttt{[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}}
+\texttt{[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-}\\
+\texttt{[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}}
 \end{center}
 
 Si el identificador no supera ninguna de las dos validaciones, se lanza la misma
@@ -484,26 +518,85 @@ solo los campos ligeros (\texttt{id}, \texttt{name}, \texttt{createdAt},
 \texttt{metadata}), sin incluir el array \texttt{coveragePoints}. De este modo, el
 listado no satura al cliente cuando hay múltiples simulaciones almacenadas.
 
+\subsection{Motor Java para simulaciones bajo demanda}
+\label{sec:backend_java_engine}
+
+En la fase~1, la operación \texttt{POST /api/simulations} recibe un nombre, frecuencia, altura del
+receptor, tamaño de área, paso de cuadrícula, pérdidas de cable y un transmisor. El modelo
+\texttt{SimulationRequest} limita la frecuencia a 0,4--7,125~GHz, el área a
+0,1--50~km, el paso solicitado a 10--10\,000~m y la cuadrícula a 100\,000 puntos como
+máximo, además de un límite estimado de 20 millones de muestras de perfiles.
+La rejilla incluye ambos extremos: calcula
+$\lceil\text{área}/\text{paso solicitado}\rceil+1$ puntos por eje y conserva en los
+metadatos los pasos solicitado y efectivo. El alcance documentado es un único transmisor.
+
+Para cada punto de la cuadrícula, \texttt{PropagationEngine} calcula la pérdida en espacio
+libre y añade la pérdida de difracción de Deygout sobre un perfil de elevación muestreado
+del GeoTIFF local~\cite{deygout1966multiple}. La curvatura terrestre se aproxima mediante
+un radio efectivo de $4/3$ del radio medio terrestre. A partir de la EIRP se obtiene un
+proxy de potencia, etiquetado RSRP en la interfaz. Este valor se limita al intervalo
+$[-140,-40]$~dBm y se omiten del JSON los puntos por debajo de
+$-130$~dBm. Esta implementación es distinta de Longley--Rice y no modela
+edificios ni reflexiones en fachadas. El proxy no es una medida física de SS-RSRP.
+Las extensiones posteriores integradas localmente y sus límites se describen en la
+Sección~\ref{sec:avances_posteriores}.
+
+\texttt{SimulationCreationService} crea un UUID y una marca temporal, incorpora los
+parámetros y metadatos del motor (\texttt{FSPL+Deygout} y origen del terreno)
+y persiste el JSON en el directorio configurado. El valor predeterminado de
+\texttt{terrain.source} es \texttt{Raster local (procedencia no especificada)};
+la configuración de Compose especifica terreno sintético para su raster de demo.
+La etiqueta no verifica por sí sola la procedencia del fichero. Una versión anterior
+atribuyó indebidamente \texttt{SRTM\_30m\_local} a terreno sintético. La escritura
+se realiza primero en un fichero temporal y después se mueve al nombre definitivo, usando
+un movimiento atómico cuando el sistema de archivos lo permite. El resultado se devuelve
+al cliente para que la interfaz lo seleccione y visualice.
+
+\subsection{Apoyos de planificación y opciones radio}
+\label{sec:apoyos_planificacion}
+
+Además del recorrido principal, una implementación local permite importar observaciones
+compatibles con el proxy de potencia y calibrar un desplazamiento, conservando el
+escenario original. Se separan las observaciones de ajuste y reserva, se emparejan con
+los puntos cercanos de la malla y se informa el sesgo y el RMSE antes y después del
+ajuste. Los ensayos descritos en el capítulo~\ref{cap:capitulo5} son sintéticos: no
+convierten el proxy en SS-RSRP físico ni acreditan mejora en campo.
+
+La recomendación de emplazamiento evalúa candidatos y objetivos discretos sobre un
+área cuadrada o un polígono simple. La selección voraz favorece al candidato que cubre
+más objetivos pendientes; depende de la malla y del umbral y no garantiza un óptimo
+global ni cobertura continua. El resultado es una ayuda para el operador, no una
+sustitución de las restricciones y la inspección del lugar.
+
+Como complementos se han ensayado un patrón direccional aproximado configurable por
+azimut e inclinación, una pérdida de \textit{clutter} introducida manualmente y un
+perfil de enlace con primera zona de Fresnel. No representan, respectivamente, un
+diagrama medido de antena ni un mapa real de usos del suelo; el perfil depende de la
+procedencia y calidad del raster. La integración con el frontend y backend reorganizados
+debe comprobarse de nuevo.
+
 \subsection{Controlador REST}
 \label{sec:backend_controller}
 
-\texttt{SimulationController} expone tres endpoints bajo el prefijo
-\texttt{/api/simulations}, todos de solo lectura (GET). El Cuadro~\ref{tab:endpoints}
-los resume.
+\texttt{SimulationController} expone operaciones de consulta y de creación bajo el prefijo
+\texttt{/api/simulations}. El Cuadro~\ref{tab:impl_endpoints} las resume.
 
 \begin{table}[H]
 \centering
-\caption{Endpoints de la API REST.}
+\caption{Endpoints principales de la API REST.}
 \label{tab:impl_endpoints}
-\begin{tabular}{|l|l|l|}
+\small
+\begin{tabularx}{\textwidth}{|c|>{\raggedright\arraybackslash}p{5.7cm}|X|}
 \hline
 \textbf{Método} & \textbf{URL} & \textbf{Descripción} \\
 \hline
-GET & \texttt{/api/simulations}            & Listado de simulaciones (sin puntos) \\
-GET & \texttt{/api/simulations/\{id\}}     & JSON completo con \texttt{coveragePoints} \\
+POST & \texttt{/api/simulations} & Valida parámetros, calcula una simulación Java y persiste el JSON \\
+DELETE & \texttt{/api/simulations/\{id\}} & Elimina el JSON tras confirmar; rechaza UUID inválido o identidad inconsistente \\
+GET & \texttt{/api/simulations} & Listado de simulaciones (sin puntos) \\
+GET & \texttt{/api/simulations/\{id\}} & JSON completo con \texttt{coveragePoints} \\
 GET & \texttt{/api/simulations/\{id\}/export} & Descarga como fichero adjunto \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 El endpoint de listado soporta paginación opcional: si el cliente envía los parámetros
@@ -513,11 +606,25 @@ completa y devuelve un DTO \texttt{PageResponse} con los campos \texttt{content}
 envía el parámetro \texttt{page}, devuelve la lista completa para mantener la
 compatibilidad con clientes simples.
 
-\begin{lstlisting}[language=Java, caption={Endpoints del controlador REST.}, label={cod:controller}]
+\begin{lstlisting}[language=Java, caption={Fragmento de endpoints del controlador REST.}, label={cod:controller}]
 @RestController
 @RequestMapping("/api/simulations")
 public class SimulationController {
     private final SimulationService service;
+    private final SimulationCreationService creationService;
+
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE,
+                 produces = MediaType.APPLICATION_JSON_VALUE)
+    public JsonNode createSimulation(
+            @Valid @RequestBody SimulationRequest request) throws IOException {
+        return creationService.create(request);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteSimulation(@PathVariable String id) {
+        service.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> listSimulations(
@@ -552,8 +659,8 @@ public class SimulationController {
 }
 \end{lstlisting}
 
-El endpoint de exportación añade la cabecera \texttt{Content-Disposition: attachment}
-para que el navegador descargue el JSON como fichero en vez de mostrarlo en línea.
+El endpoint de exportación añade la cabecera HTTP de descarga para que el navegador
+descargue el JSON como fichero en vez de mostrarlo en línea.
 Internamente delega en \texttt{SimulationService.getFileResource()}, que devuelve un
 \texttt{FileSystemResource} apuntando al fichero original.
 
@@ -610,7 +717,9 @@ de entorno (\texttt{SIMULATIONS\_DATA\_DIR}).
 
 La clase \texttt{CorsConfig} registra una política CORS que permite peticiones desde
 \texttt{http://localhost:4200} (el servidor de desarrollo de Angular) con los métodos
-\texttt{GET} y \texttt{OPTIONS}. Esta configuración es imprescindible durante el
+\texttt{GET}, \texttt{POST} y \texttt{DELETE}. Spring gestiona las peticiones
+\textit{preflight} \texttt{OPTIONS} para comprobar los métodos solicitados, sin incluir
+\texttt{OPTIONS} en la lista de métodos de aplicación configurados. Esta configuración es imprescindible durante el
 desarrollo local, ya que navegador y backend corren en puertos distintos y sin la
 cabecera \texttt{Access-Control-Allow-Origin} el navegador bloquearía las peticiones.
 
@@ -623,36 +732,42 @@ directamente desde el navegador sin necesidad de herramientas externas como Post
 \subsection{Tests unitarios}
 \label{sec:backend_tests}
 
-El servicio de simulaciones cuenta con once tests unitarios escritos con JUnit~5. La
-anotación \texttt{@TempDir} de JUnit crea un directorio temporal limpio antes de cada
-test, lo que garantiza el aislamiento entre ejecuciones. Los casos de prueba se agrupan
-en tres categorías:
+El informe Maven de fase~1, fechado el 21/11/2026, contabilizó 47 pruebas: 46 ejecutadas y
+una comparación Java--MATLAB optativa omitida, sin fallos ni errores. El Cuadro~
+\ref{tab:tests_backend} resume los recuentos por clase.
 
 \begin{table}[H]
 \centering
-\caption{Resumen de los tests unitarios del backend.}
+\caption{Recuento por clase del informe Maven de fase~1 (21/11/2026).}
 \label{tab:tests_backend}
 \small
 \begin{tabularx}{\textwidth}{|l|X|X|}
 \hline
-\textbf{Método} & \textbf{Caso} & \textbf{Resultado esperado} \\
+\textbf{Clase de test} & \textbf{Tests} & \textbf{Ámbito} \\
 \hline
-\texttt{getById} & UUID válido con fichero existente  & Devuelve \texttt{JsonNode} correcto \\
-\texttt{getById} & UUID válido pero fichero inexistente & \texttt{SimulationNotFoundException} \\
-\texttt{getById} & Formato de UUID no válido           & \texttt{SimulationNotFoundException} \\
-\texttt{getById} & Intento de \textit{path traversal}  & \texttt{SimulationNotFoundException} \\
-\texttt{listAll} & Directorio vacío                    & Lista vacía \\
-\texttt{listAll} & Directorio con JSON y no-JSON        & Solo devuelve los \texttt{.json} \\
-\texttt{getFileResource} & UUID válido                 & Recurso legible \\
-\texttt{getFileResource} & Formato inválido            & \texttt{SimulationNotFoundException} \\
+\texttt{SimulationControllerTest} & 15 & Endpoints, errores, borrado y CORS \\
+\texttt{SimulationRequestValidationTest} & 4 & Límites, estructura y transmisor nulo \\
+\texttt{GeoTiffElevationModelTest} & 5 & PixelIsArea sintético, PixelIsPoint, lectura y extensión \\
+\texttt{PropagationEngineTest} & 5 & FSPL, difracción y cálculo de la cuadrícula \\
+\texttt{SimulationCreationServiceTest} & 1 & Creación y persistencia JSON \\
+\texttt{SimulationServiceTest} & 16 & Consulta, listado, borrado y exportación \\
+\texttt{MatlabScenarioComparisonTest} & 1 & Comparación optativa Java--MATLAB (omitida en esta ejecución) \\
 \hline
 \end{tabularx}
 \end{table}
 
-Los tests de \textit{path traversal} verifican que cadenas como
-\texttt{../.../etc/passwd} o prefijos con secuencias codificadas
-(\texttt{\%2F}) son rechazadas antes de tocar el sistema de ficheros, validando
-así la defensa en profundidad implementada en \texttt{SimulationService}.
+El XML JaCoCo de fase~1 (\texttt{backend/target/site/jacoco/jacoco.xml}, generado el
+21/11/2026 a las 21:22) registr\'o 409 de 453 l\'ineas cubiertas (90,3~\%) y 137 de 192
+ramas (71,4~\%) en 26 clases de producci\'on. La cobertura de c\'odigo es una medida
+estructural: no acredita la exactitud de la predicci\'on radioel\'ectrica ni sustituye una
+validaci\'on con mediciones.
+
+En la validación del candidato integrado, Maven registró 82 casos: 79 ejecutados y
+superados y tres omitidos, sin fallos. Los omitidos corresponden al SRTM local, la
+recomendación con raster local y la comparación histórica. Un control selectivo
+adicional Java--MATLAB sintético fue satisfactorio con diferencias inferiores a
+$10^{-8}$~dB. Los resultados detallados y sus límites se presentan en el
+Capítulo~\ref{cap:capitulo5}.
 
 \section{Frontend: Aplicación Angular}
 \label{sec:impl_frontend}
@@ -668,7 +783,7 @@ prácticas recomendadas en Angular moderno.
 \subsection{Arquitectura de componentes}
 \label{sec:frontend_componentes}
 
-La aplicación está compuesta por siete componentes, cada uno independiente y declarado
+La aplicación está compuesta por ocho componentes, cada uno independiente y declarado
 con \texttt{standalone:~true}. El Cuadro~\ref{tab:componentes_angular} los enumera junto
 con su responsabilidad.
 
@@ -676,19 +791,20 @@ con su responsabilidad.
 \centering
 \caption{Componentes de la aplicación Angular.}
 \label{tab:componentes_angular}
-\begin{tabular}{|l|l|}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{5.8cm}|X|}
 \hline
 \textbf{Componente} & \textbf{Responsabilidad} \\
 \hline
 \texttt{HeaderComponent}           & Barra superior con título y toggle de tema \\
-\texttt{SidebarComponent}          & Selector de simulación, filtro RSRP, estadísticas \\
+\texttt{SidebarComponent}          & Selector de simulación, histórico, filtro RSRP y estadísticas \\
 \texttt{MapComponent}              & Mapa Leaflet con \textit{heatmap} y marcador TX \\
 \texttt{InfoPanelComponent}        & Detalle del punto seleccionado al hacer clic \\
 \texttt{StatsPanelComponent}       & Resumen estadístico de la simulación activa \\
 \texttt{CoverageLegendComponent}   & Leyenda de colores del \textit{heatmap} \\
-\texttt{SimulationConfigComponent} & Parámetros de configuración de la simulación \\
+\texttt{SimulationConfigComponent} & Formulario de parámetros, colocación del transmisor y ejecución del POST \\
+\texttt{ComparisonViewComponent} & Comparación de dos escenarios en mapas y paneles de parámetros \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \texttt{AppComponent} actúa como raíz: importa los componentes
@@ -762,9 +878,9 @@ $(\text{RSRP} + 140) / 100$, donde $-140$~dBm se mapea a 0 y $-40$~dBm a 1.
 \subsection{Componente de mapa}
 \label{sec:frontend_mapa}
 
-\texttt{MapComponent} es el componente más complejo de la interfaz. Integra la
-librería Leaflet~1.9.4 con el \textit{plugin} \texttt{leaflet.heat} para renderizar
-el mapa de calor de cobertura sobre tiles cartográficos de CARTO (\textit{dark\_all}).
+\texttt{MapComponent} integra Leaflet~1.9.4 con el \textit{plugin}
+\texttt{leaflet.heat} para renderizar el mapa de calor. El usuario puede elegir entre
+cartografía OpenStreetMap, imágenes de ESRI y relieve de OpenTopoMap.
 
 El mapa se inicializa en \texttt{ngOnInit} centrado en las coordenadas del campus
 URJC (40,2897°~N, 3,8244°~W) con zoom 13. Un \texttt{effect()} de Angular observa
@@ -802,8 +918,8 @@ private updateHeatmap(points: CoveragePoint[]): void {
 El gradiente de colores replica los umbrales de clasificación del
 Cuadro~\ref{tab:rsrp_umbrales}: rojo para señal débil, naranja para aceptable,
 amarillo para buena y verde para excelente. \texttt{leaflet.heat} dibuja todos los
-puntos en un único elemento \texttt{<canvas>}, lo que permite renderizar los 3600
-puntos de la cuadrícula sin penalización visible de rendimiento.
+puntos en un único elemento \texttt{<canvas>}. No se ha medido el tiempo de renderizado
+del mapa en un navegador ni se afirma el cumplimiento de un umbral de rendimiento.
 
 El manejador de \textit{click} del mapa busca el punto de cobertura más cercano
 al lugar pulsado mediante distancia euclidiana en grados. Si la distancia es inferior
@@ -816,9 +932,8 @@ deselecciona cualquier punto previo.
 
 La cartografía base condiciona la legibilidad del \textit{heatmap}: un fondo demasiado
 saturado oculta los gradientes de cobertura, mientras que un fondo neutro los realza.
-Para dar flexibilidad al usuario y, al mismo tiempo, soportar despliegues sin
-conectividad, la aplicación incorpora un \texttt{MapTileService} que centraliza la
-gestión de las capas cartográficas y un mini-selector visual integrado en el mapa.
+La aplicación incorpora un \texttt{MapTileService} que centraliza la gestión de las capas
+cartográficas y un selector visual integrado en el mapa.
 
 \subsubsection{Catálogo de cartografías}
 
@@ -845,19 +960,15 @@ La elección persiste en \texttt{localStorage} bajo la clave \texttt{gd5g-map-th
 de manera que sobrevive a recargas del navegador. Un \textit{signal} \texttt{current}
 expone el tema activo y los componentes \texttt{MapComponent} y \texttt{ComparisonViewComponent}
 reaccionan automáticamente reemplazando la capa de \textit{tiles} mediante un
-\texttt{effect()} de Angular. Adicionalmente, el servicio incorpora la infraestructura
-necesaria para servir \textit{tiles} vectoriales locales (descrita a continuación);
-esta capacidad se ha dejado preparada como camino de optimización para despliegues
-sin conectividad, aunque por ahora la interfaz solo expone las tres cartografías raster.
+\texttt{effect()} de Angular. Los tres proveedores raster requieren conectividad para
+solicitar sus tiles; no se ha verificado un modo de funcionamiento sin conexión.
 
 \subsubsection{Tiles vectoriales locales con PMTiles}
 
-Las tres primeras cartografías son \textit{tiles} raster servidos desde CDN públicos.
-Esta solución, aunque cómoda, presenta dos limitaciones para el uso táctico al que
-se orienta el TFG: requiere conectividad permanente y la latencia de cada \textit{tile}
-(50--150~ms en redes móviles) se acumula al hacer \textit{pan} o \textit{zoom} sobre
-el mapa, especialmente con cuadrículas de 80×80 puntos. Para mitigarlas, el servicio
-añade dos cartografías vectoriales basadas en el formato \textit{PMTiles}~\cite{protomaps2024}.
+Las tres cartografías disponibles son \textit{tiles} raster servidos desde proveedores
+externos. El servicio contiene una rama de código preparada para renderizar PMTiles, pero
+el catálogo activo no define ningún tema vectorial; por ello, esta funcionalidad no se
+ofrece desde la interfaz ni se considera una capacidad de uso implementada.
 
 \paragraph{El formato PMTiles.}
 PMTiles es un contenedor de \textit{tiles} desarrollado por Protomaps que almacena
@@ -865,19 +976,14 @@ millones de \textit{tiles} en un único fichero binario. El cliente accede a los
 \textit{tiles} mediante peticiones HTTP \emph{range requests} (cabecera
 \texttt{Range: bytes=offset-end}), por lo que no se requiere un servidor de
 \textit{tiles} dedicado: basta con servir el fichero como contenido estático.
-Para España, un PMTiles con la cobertura completa pesa entre 25 y 50~MB
-(extracto del \textit{build} mundial diario de Protomaps), frente a los varios
-gigabytes que ocuparía la misma área en formato raster a múltiples niveles de zoom.
+Su uso requeriría disponer del fichero y añadir un tema vectorial al catálogo; estas
+condiciones no forman parte del flujo verificado en esta versión.
 
 \paragraph{Renderizado vectorial sobre Leaflet.}
-La librería \texttt{protomaps-leaflet} actúa como puente entre el contenedor PMTiles
-y la API de capas de Leaflet. Al instanciar \texttt{leafletLayer(\{ url, theme \})},
-crea una \texttt{L.Layer} estándar que dibuja los \textit{features} vectoriales sobre
-un \texttt{<canvas>} HTML5 y aplica un estilo predefinido (\textit{light} u
-\textit{dark}). Esta integración resulta crítica para el proyecto, porque permite
-incorporar \textit{tiles} vectoriales sin renunciar al \textit{plugin} \texttt{leaflet.heat}
-ni reescribir el resto del componente. El \texttt{MapTileService} discrimina la fuente
-mediante el campo \texttt{kind}:
+La dependencia \texttt{protomaps-leaflet} y la rama \texttt{kind: 'vector'} preparan la
+integración con Leaflet, pero no hay una cartografía PMTiles declarada en
+\texttt{MAP\_THEMES}. El fragmento siguiente ilustra esa rama de código, no una opción
+activa del usuario:
 
 \begin{lstlisting}[language=JavaScript, caption={Construcción polimórfica de la capa de \textit{tiles}.}, label={cod:tile_layer}]
 createTileLayer(themeId?: string): L.Layer {
@@ -895,55 +1001,11 @@ createTileLayer(themeId?: string): L.Layer {
 }
 \end{lstlisting}
 
-\paragraph{Estrategia de \textit{fallback} y fichero descargado.}
-El servicio aplica una resolución perezosa de la URL: en la primera petición
-verifica con un \texttt{HEAD} la existencia del fichero local
-\texttt{assets/tiles/spain.pmtiles}. Si está disponible, lo usa; si no, recurre al
-CDN público de Protomaps. Para descargar el fichero se proporciona el
-\textit{script} \texttt{mockups/.../scripts/download-pmtiles.ps1}, que ofrece dos
-caminos:
-
-\begin{enumerate}
-\item \textbf{Recomendado, \textit{extract} de la Península Ibérica}: usando la
-  CLI oficial \texttt{pmtiles}~\cite{protomaps2024} se recorta del \textit{build}
-  mundial diario un PMTiles limitado a la \textit{bbox}
-  $[-18{,}5,\ 27{,}5,\ 4{,}4,\ 44{,}0]$ (Iberia + Baleares + Canarias). El fichero
-  resultante pesa entre 25 y 50~MB, suficiente para cubrir todos los escenarios
-  contemplados en el TFG.
-
-\item \textbf{Alternativa sin CLI, demo mundial completo}: el \textit{bucket}
-  público de Protomaps sirve el \textit{build} más reciente del planeta entero
-  en la URL
-  \texttt{https://demo-bucket.protomaps.com/v4.pmtiles}. Este fichero supera
-  \textbf{1~GB} y solo se recomienda cuando se necesita cobertura mundial sin
-  conexión y se dispone de espacio suficiente.
-\end{enumerate}
-
-Una vez colocado el fichero en \texttt{src/assets/tiles/spain.pmtiles}, el frontend
-lo detecta automáticamente y la latencia por \textit{tile} pasa de los 50--150~ms
-de la red al orden de milisegundos de la lectura local.
-
-\paragraph{Comparativa de coste.}
-El Cuadro~\ref{tab:tile_comp} resume la comparativa entre los dos enfoques tras pruebas
-informales sobre los tres escenarios de referencia:
-
-\begin{table}[h!]
-\centering
-\caption{Comparativa entre \textit{tiles} raster remotos y vectoriales locales.}
-\label{tab:tile_comp}
-\small
-\begin{tabular}{|l|l|l|}
-\hline
-\textbf{Métrica} & \textbf{Raster remoto} & \textbf{Vector local (PMTiles)} \\
-\hline
-Tamaño descargado por sesión & 5--15~MB & 25--50~MB (única vez) \\
-Latencia por \textit{tile}          & 50--150~ms                & $<$~5~ms (lectura local) \\
-Personalización del estilo  & Nula                      & Total (JSON declarativo) \\
-Funciona \textit{offline}   & No                        & Sí \\
-Coste de \textit{bundle} JS         & 0 KB                      & +210~KB (\texttt{pmtiles}+\texttt{protomaps-leaflet}) \\
-\hline
-\end{tabular}
-\end{table}
+El código puede intentar usar primero el fichero local y recurrir a un CDN de Protomaps si
+la comprobación HTTP falla. Como no existe un tema vectorial activo y no se ha verificado
+el uso de un fichero local, este mecanismo se documenta como preparación técnica, no como
+función disponible. Tampoco se han medido latencia, consumo de datos, tamaño de tiles o
+funcionamiento sin conexión; no se atribuyen ventajas de rendimiento a esta rama.
 
 \subsubsection{Mini-dashboard de selección}
 
@@ -964,19 +1026,22 @@ La aplicación ofrece un cambio de tema claro/oscuro gestionado por
 \texttt{ThemeService}. Este servicio mantiene un \textit{signal} booleano
 (\texttt{darkMode}), persiste la preferencia en \texttt{localStorage} con la clave
 \texttt{gd5g-theme} y aplica la clase CSS \texttt{theme-light} al \texttt{<body>}
-cuando el usuario alterna al modo claro. El tema oscuro es el predeterminado, ya que
-los mapas con tiles CARTO \textit{dark\_all} se integran mejor visualmente con fondos
-oscuros.
+cuando el usuario alterna al modo claro. La cartografía activa se puede cambiar de forma
+independiente mediante el selector del mapa.
 
-El \textit{sidebar} izquierdo ofrece tres controles principales: un selector
-\texttt{<select>} que lista las simulaciones disponibles (por nombre de escenario o
-UUID), un deslizador (\textit{slider}) de rango $[-140, -40]$~dBm que filtra en
-tiempo real los puntos visibles en el \textit{heatmap}, y un contador que muestra
-cuántos puntos pasan el filtro respecto al total.
+El \textit{sidebar} ofrece un selector de simulaciones y un deslizador
+(\textit{slider}) de rango $[-140, -40]$~dBm que filtra los puntos visibles en el
+\textit{heatmap}. El formulario permite configurar los parámetros de simulación y
+seleccionar en el mapa la ubicación del transmisor antes de enviar el
+\texttt{POST /api/simulations}. La interfaz consulta la extensión del raster y avisa
+cuando la ubicación o el área parecen rebasarla; esta advertencia es parcial, pues el
+backend conserva la validación definitiva y puede rechazar perfiles fuera del GeoTIFF o
+sin elevación válida.
 
 El \texttt{InfoPanelComponent} se activa al hacer clic en un punto del mapa y muestra
-el nivel RSRP con un indicador visual de barras (1 a 4 barras activas según la calidad),
-las coordenadas geográficas exactas, el rango de umbrales 3GPP y una estimación del
+el nivel RSRP con un indicador visual de barras (1 a 4 segmentos según el intervalo
+visual del prototipo), las coordenadas geográficas exactas, los intervalos visuales
+propios del prototipo y una estimación del
 \textit{path loss}: $PL \approx \text{EIRP} - \text{RSRP}$, donde $\text{EIRP}$ se
 aproxima como $P_{tx} + 13$~dB a partir de los metadatos de la simulación.
 
@@ -1012,69 +1077,61 @@ modelo de la API del modelo de la vista.
 \section{Integración del sistema}
 \label{sec:impl_integracion}
 
-Las tres capas descritas en las secciones anteriores forman un \textit{pipeline}
-lineal de datos que no requiere base de datos ni colas de mensajes: la simulación
-genera ficheros, el backend los sirve y el frontend los renderiza. Esta sencillez
-es deliberada y responde a los requisitos del escenario táctico, donde el sistema
-debe poder desplegarse en un portátil de campo sin infraestructura adicional.
+Los componentes forman un flujo local de simulación, consulta y visualización que no
+requiere una base de datos ni una cola de mensajes. La persistencia en ficheros permite
+consultar resultados, aunque no implementa historial versionado ni trazabilidad de medidas.
 
 \subsection{Flujo de datos extremo a extremo}
 \label{sec:integracion_flujo}
 
-El flujo completo consta de cuatro etapas:
+El sistema mantiene dos caminos de cálculo que convergen en la visualización:
 
 \begin{enumerate}
-\item \textbf{Simulación}: el operador ejecuta \texttt{simulacion\_cobertura\_5g.m}
-  en MATLAB con los parámetros deseados (frecuencia, potencia, emplazamiento). El
-  bloque 7 invoca \texttt{exportar\_json.m}, que genera un fichero
-  \texttt{<uuid>.json} en \texttt{matlab/output/}.
-\item \textbf{Servicio}: Spring Boot, configurado con
-  \texttt{simulations.data-dir=../matlab/output}, detecta los ficheros JSON del
-  directorio y los expone en la API REST sin necesidad de reiniciar ni recargar.
-\item \textbf{Presentación}: la aplicación Angular solicita el listado de
-  simulaciones al arrancar (\texttt{GET /api/simulations}), presenta el selector
-  en el \textit{sidebar} y, cuando el usuario elige una, solicita el JSON completo
-  (\texttt{GET /api/simulations/\{uuid\}}).
-\item \textbf{Visualización}: con los \texttt{coveragePoints} recibidos, el
-  \texttt{MapComponent} construye el \textit{heatmap} sobre Leaflet y lo muestra
-  en pantalla.
+\item \textbf{Referencia MATLAB}: al ejecutar \texttt{simulacion\_cobertura\_5g.m},
+  el bloque de exportación escribe un JSON en \texttt{matlab/output/}. Los escenarios
+  existentes usan Longley--Rice y declaran \texttt{SRTM\_90m\_global}.
+\item \textbf{Predicción interactiva Java}: la interfaz envía los parámetros con
+  \texttt{POST /api/simulations}; Spring Boot valida la petición, calcula FSPL+Deygout
+  usando el GeoTIFF local y persiste la respuesta JSON en el mismo directorio configurado.
+\item \textbf{Consulta}: Angular solicita el listado mediante
+  \texttt{GET /api/simulations} y el detalle completo mediante
+  \texttt{GET /api/simulations/\{uuid\}}.
+\item \textbf{Visualización}: la aplicación transforma los \texttt{coveragePoints},
+  presenta el mapa de calor en Leaflet y permite inspeccionar o comparar escenarios.
 \end{enumerate}
 
-Este diseño desacoplado permite que cada capa evolucione de forma independiente.
-Basta con respetar el contrato JSON para que un cambio en el modelo de propagación
-de MATLAB no afecte ni al backend ni al frontend.
+Los dos motores comparten el formato de salida general, pero sus metadatos identifican
+modelo y terreno; los resultados no se deben mezclar como si procedieran de un mismo motor.
 
 \subsection{Formato de intercambio JSON}
 \label{sec:integracion_json}
 
-El fichero JSON constituye el contrato de interfaz entre MATLAB y Spring Boot.
-Su esquema, definido implícitamente por \texttt{exportar\_json.m} y consumido por
-\texttt{SimulationService} vía Jackson, contiene cinco campos raíz:
+El fichero JSON constituye el contrato de intercambio entre los motores y Spring Boot.
+Las salidas contienen los campos raíz siguientes:
 
 \begin{table}[H]
 \centering
 \caption{Esquema del fichero JSON de simulación.}
 \label{tab:json_schema}
-\begin{tabular}{|l|l|l|}
+\begin{tabularx}{\textwidth}{|l|l|X|}
 \hline
 \textbf{Campo} & \textbf{Tipo} & \textbf{Descripción} \\
 \hline
-\texttt{id}             & \texttt{string}  & UUID~v4 generado por la JVM de MATLAB \\
+\texttt{id}             & \texttt{string}  & UUID~v4 generado por MATLAB o Java \\
 \texttt{name}           & \texttt{string}  & Nombre descriptivo del escenario \\
 \texttt{createdAt}      & \texttt{string}  & Marca temporal ISO~8601 (UTC) \\
 \texttt{metadata}       & \texttt{object}  & Parámetros normalizados (frecuencia, modelo, etc.) \\
-\texttt{parameters}     & \texttt{object}  & Copia de la estructura \texttt{params} de MATLAB \\
+\texttt{parameters}     & \texttt{object}  & Parámetros de la ejecución; los nombres varían entre motores \\
 \texttt{coveragePoints} & \texttt{array}   & Array de \texttt{\{lat, lng, rsrp\}} \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 El campo \texttt{metadata} expone los parámetros en claves normalizadas en inglés
 (\texttt{frequency\_ghz}, \texttt{tx\_power\_dbm}, \texttt{antenna\_height\_m},
 \texttt{tx\_location}, \texttt{model}, \texttt{terrain\_data}) para que el frontend
-pueda consumirlos directamente sin conocer la nomenclatura interna de MATLAB. El campo
-\texttt{parameters} conserva los nombres originales de la estructura MATLAB por
-compatibilidad con análisis posteriores.
+pueda consumirlos directamente. El campo \texttt{parameters} conserva el conjunto de
+parámetros empleado por cada motor; sus nombres no son idénticos entre MATLAB y Java.
 
 En el lado del backend, la deserialización la realiza Jackson a través de
 \texttt{ObjectMapper.readTree()}, que construye un árbol \texttt{JsonNode} genérico.
@@ -1102,11 +1159,11 @@ siguientes prerrequisitos:
 \hline
 \textbf{Herramienta} & \textbf{Versión mínima} & \textbf{Propósito} \\
 \hline
-MATLAB          & R2025b  & Simulación radioeléctrica \\
+MATLAB          & R2025b  & Generación de escenarios de referencia \\
 Java JDK        & 17      & Compilación y ejecución del backend \\
 Apache Maven    & 3.9+    & Gestión de dependencias del backend \\
-Node.js         & 18 LTS  & Entorno de ejecución del frontend \\
-Angular CLI     & 17+     & Compilación y servidor de desarrollo \\
+Node.js         & Según \texttt{package.json} & Entorno de ejecución del frontend \\
+Angular CLI     & Según \texttt{package.json} & Compilación y servidor de desarrollo \\
 \hline
 \end{tabular}
 \end{table}
@@ -1114,13 +1171,12 @@ Angular CLI     & 17+     & Compilación y servidor de desarrollo \\
 El orden de arranque recomendado es:
 
 \begin{enumerate}
-\item Ejecutar la simulación en MATLAB para generar al menos un fichero JSON en
-  \texttt{matlab/output/}.
+\item Opcional: ejecutar la simulación MATLAB para generar un escenario de referencia.
+  La simulación bajo demanda de la aplicación usa el motor Java y no necesita MATLAB.
 \item Arrancar el backend desde la carpeta \texttt{backend/} con
   \texttt{mvn spring-boot:run}. El servidor queda disponible en
   \texttt{http://localhost:8080}.
-\item Arrancar el frontend desde
-  \texttt{mockups/mockup\_v1/gemelo-digital-5g/} con \texttt{ng serve}. La
+\item Arrancar el frontend desde \texttt{frontend/} con \texttt{ng serve}. La
   aplicación queda disponible en \texttt{http://localhost:4200}.
 \end{enumerate}
 
@@ -1137,13 +1193,12 @@ El backend se empaqueta como un JAR ejecutable estándar de Spring Boot:
 
 \begin{lstlisting}[caption={Compilación y ejecución del backend.}, label={cod:build}]
 cd backend/
-mvn clean package -DskipTests
+mvn clean package
 java -jar target/gemelo5g-0.1.0-SNAPSHOT.jar \
      --simulations.data-dir=/ruta/a/jsons
 \end{lstlisting}
 
-El comando \texttt{mvn package} compila el código, ejecuta los tests (omitidos aquí
-con \texttt{-DskipTests} para acelerar) y produce un JAR con todas las dependencias
+El comando \texttt{mvn package} compila el código, ejecuta los tests y produce un JAR con todas las dependencias
 incluidas gracias al \textit{plugin} \texttt{spring-boot-maven-plugin}. La propiedad
 \texttt{simulations.data-dir} se puede sobreescribir por línea de comandos para
 apuntar a cualquier directorio que contenga los JSON de simulación.

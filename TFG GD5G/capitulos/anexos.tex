@@ -33,15 +33,30 @@ con todos los escenarios disponibles. Al elegir uno, el frontend llama al
 cobertura y reconstruye el \textit{heatmap}. El mapa se centra automáticamente
 en la antena transmisora (TX) del nuevo escenario.
 
+\section{Creación y apoyos de planificación}
+
+Para estudiar un emplazamiento se coloca una antena en el mapa y se introducen
+frecuencia, potencia, alturas, área y espaciado. La interfaz solicita el cálculo
+al backend Java y presenta la simulación guardada. El resultado representa un
+proxy de potencia, no una medición de SS-RSRP.
+
+Como apoyo, las observaciones compatibles se pueden importar para ajustar un
+desplazamiento y evaluar sus residuos sobre un conjunto de reserva. La recomendación
+evalúa candidatos de un área y propone un emplazamiento mediante selección voraz;
+no garantiza un óptimo global. El patrón direccional, la pérdida manual de
+\textit{clutter} y el perfil con Fresnel complementan la exploración. La integración
+completa de las interacciones entre estos controles debe verificarse.
+
 \section{Filtro RSRP}
 \label{sec:manual_rsrp}
 
 El \textit{slider} ``Umbral RSRP mínimo'' filtra en tiempo real los puntos de
 cobertura que se muestran en el \textit{heatmap}. Su rango va de $-140$~dBm
-(muestra todos los puntos) a $-40$~dBm (solo zonas de excelente cobertura). El
+(muestra todos los puntos) a $-40$~dBm. Los nombres de los niveles son etiquetas
+visuales del prototipo; el filtro no equivale a un umbral normativo ni acredita
+la viabilidad de un servicio. El
 contador situado bajo el \textit{slider} indica cuántos puntos pasan el filtro
-de un total. Esta herramienta permite visualizar de un vistazo la huella de
-cobertura efectiva por encima de un umbral operativo.
+de un total y permite explorar el mapa con distintos cortes de RSRP.
 
 \section{Inspección puntual}
 \label{sec:manual_inspeccion}
@@ -49,8 +64,9 @@ cobertura efectiva por encima de un umbral operativo.
 Al hacer clic sobre el mapa, el frontend busca el punto de cobertura más cercano
 al lugar pulsado. Si la distancia es inferior a aproximadamente 300~m, el
 \texttt{InfoPanelComponent} se despliega mostrando: el valor de RSRP en dBm, una
-escala visual de barras (1 a 4 barras según calidad), las coordenadas geográficas
-con seis decimales, los umbrales 3GPP correspondientes a la categoría y una
+escala visual de barras (1 a 4 segmentos según el intervalo visual del prototipo),
+las coordenadas geográficas con seis decimales, los intervalos visuales propios
+del prototipo y una
 estimación del \textit{path loss} ($PL \approx \text{EIRP} - \text{RSRP}$).
 
 \section{Comparación de simulaciones}
@@ -64,16 +80,21 @@ desplegable que aparece bajo el botón.
 
 El \textit{dashboard} central muestra:
 \begin{itemize}
-\item Diferencia media $\Delta\overline{\text{RSRP}} = \overline{\text{A}} - \overline{\text{B}}$.
+\item Diferencia media $\overline{\Delta} = \operatorname{media}(\text{RSRP}_A-\text{RSRP}_B)$ sobre los puntos emparejados.
 \item Cuando los dos escenarios solapan espacialmente, un desglose de zonas
   donde A es mejor, B es mejor o son similares ($|\Delta| \leq 2$~dB).
-\item Distribución comparada de la calidad de cobertura por categorías.
+\item Distribución comparada de los puntos por intervalos visuales de RSRP.
 \item Tabla de parámetros confrontados (frecuencia, potencia, altura, modelo).
 \end{itemize}
 
 Cada uno de los dos mapas dispone de su propio selector de cartografía, lo que
 permite contrastar la misma cobertura con fondos distintos. El botón
 ``Cerrar'' devuelve a la vista única.
+
+El emparejamiento espacial usa coordenadas redondeadas a cuatro decimales. Si hay puntos
+coincidentes, la diferencia media y el recuento de zonas se calculan sobre esos pares. Si
+no hay solapamiento, la interfaz muestra únicamente la diferencia entre las medias globales
+de A y B; no presenta recuentos de zonas como si fueran comparaciones punto a punto.
 
 \section{Selector de cartografía}
 \label{sec:manual_cartografia}
@@ -86,12 +107,11 @@ almacenamiento local del navegador.
 \section{Interpretación del \textit{heatmap}}
 \label{sec:manual_interpretacion}
 
-El gradiente cromático del \textit{heatmap} sigue la clasificación de calidad de
-señal RSRP descrita en el Cuadro~\ref{tab:rsrp_umbrales} (capítulo~\ref{cap:capitulo4}):
-rojo para zonas con señal débil ($< -100$~dBm), naranja para aceptable
-($-100$ a $-85$~dBm), amarillo para buena ($-85$ a $-70$~dBm) y verde para
-excelente ($> -70$~dBm). El icono de antena marca la posición exacta del
-transmisor.
+El gradiente cromático del \textit{heatmap} representa los intervalos visuales de
+RSRP elegidos por el prototipo, descritos en el Cuadro~\ref{tab:rsrp_umbrales}
+(capítulo~\ref{cap:capitulo4}). Sus etiquetas no son categorías universales de
+calidad ni predicen por sí solas la disponibilidad de un servicio. El icono de
+antena marca la posición exacta del transmisor.
 
 \chapter{Anexo B: Manual de Instalación}
 \label{anx:manual_instalacion}
@@ -103,7 +123,8 @@ en el Cuadro~\ref{tab:prereqs} del capítulo~\ref{cap:capitulo4}. A modo de
 recordatorio, los componentes mínimos necesarios son:
 
 \begin{itemize}
-\item \textbf{MATLAB R2025b} (probado con Update~4) con los \textit{toolboxes}
+\item \textbf{MATLAB R2025b} (probado con Update~4), solo para reproducir los
+  escenarios y referencias MATLAB, con los \textit{toolboxes}
   \textit{Communications}, \textit{Mapping} y \textit{Antenna}. Sin
   \textit{Communications Toolbox} el motor cae en COST-231 con advertencia.
 \item \textbf{Java JDK 17} y \textbf{Apache Maven} 3.9 o superior.
@@ -120,13 +141,14 @@ git clone https://github.com/amartii/TFG.git
 cd TFG
 \end{lstlisting}
 
-\section{Datos de elevación SRTM}
+\section{Datos de elevación}
 
-El motor MATLAB necesita el \textit{tile} SRTM \texttt{N40W004} (cubre Madrid,
-Sierra de Guadarrama y Fuenlabrada). Se descarga desde USGS EarthExplorer
-siguiendo las instrucciones de \texttt{matlab/data/DESCARGAR\_SRTM.md} y se
-guarda como \texttt{matlab/data/srtm\_fuenlabrada.tif}. Si el fichero no está
-presente, los \textit{scripts} caen en terreno plano con \textit{warning}.
+El backend Java requiere un GeoTIFF configurado en \texttt{terrain.srtm-path}
+que cubra el área de estudio. Su procedencia debe documentarse: un raster sintético
+no es SRTM aunque un nombre o etiqueta lo indique. Los scripts MATLAB históricos
+pueden utilizar un raster local; si no está disponible, algunas rutas recurren a
+terreno alternativo o plano con advertencia. Debe comprobarse qué datos se utilizaron
+efectivamente antes de interpretar una salida.
 
 \section{Generación de simulaciones}
 
@@ -157,21 +179,26 @@ interactiva).
 En una segunda terminal:
 
 \begin{lstlisting}[language=bash, caption={Arranque del frontend.}]
-cd mockups/mockup_v1/gemelo-digital-5g
+cd frontend
 npm install     # solo la primera vez
-ng serve
+npm start
 \end{lstlisting}
 
 El servidor de desarrollo de Angular escucha en el puerto~4200. Al abrir
 \texttt{http://localhost:4200} en el navegador se carga la aplicación, que llama
 al backend y muestra la primera simulación disponible.
 
-\section{Cartografía vectorial \textit{offline} (opcional)}
+\section{Docker Compose}
+Existe una configuración de Docker Compose con raster sintético y persistencia
+aislada. Se comprobó su configuración, pero la construcción y ejecución reales de
+los contenedores y la verificación visual siguen pendientes.
 
-Para uso desconectado se proporciona el \textit{script}
+\section{Preparación de cartografía vectorial (opcional)}
+
+Se proporciona el \textit{script}
 \texttt{scripts/download-pmtiles.ps1}, descrito en el capítulo~\ref{cap:capitulo4},
-que descarga un fichero PMTiles con la cartografía vectorial de la Península
-Ibérica.
+que permite preparar un fichero PMTiles local. El catálogo actual no ofrece temas
+vectoriales, por lo que su descarga no activa el uso desconectado.
 
 \chapter{Anexo C: Código Fuente Destacado}
 \label{anx:codigo}
@@ -271,8 +298,8 @@ especificación en formato JSON en \texttt{http://localhost:8080/api-docs}.
 
 \section{Endpoints}
 
-La API consta de tres \textit{endpoints} bajo el \textit{path} base
-\texttt{/api/simulations}:
+La API ofrece operaciones de consulta, exportación, creación y borrado bajo el
+\textit{path} base \texttt{/api/simulations}:
 
 \begin{table}[h!]
 \centering
@@ -286,6 +313,8 @@ La API consta de tres \textit{endpoints} bajo el \textit{path} base
 GET & \texttt{/api/simulations}                & Lista resumida de simulaciones disponibles, opcionalmente paginada con \texttt{?page=0\&size=10}. \\
 GET & \texttt{/api/simulations/\{id\}}         & JSON completo de una simulación, incluyendo todos los \texttt{coveragePoints}. \\
 GET & \texttt{/api/simulations/\{id\}/export}  & Descarga el JSON con \texttt{Content-Disposition: attachment} para almacenamiento offline. \\
+POST & \texttt{/api/simulations}              & Valida la petición, calcula una simulación con el motor Java y la persiste. \\
+DELETE & \texttt{/api/simulations/\{id\}}      & Elimina la simulación por UUID; la interfaz solicita confirmación previamente. \\
 \hline
 \end{tabular}
 \end{table}
@@ -294,21 +323,23 @@ GET & \texttt{/api/simulations/\{id\}/export}  & Descarga el JSON con \texttt{Co
 
 \begin{itemize}
 \item \texttt{200~OK}: respuesta correcta con cuerpo JSON.
-\item \texttt{400~Bad Request}: parámetro de paginación no numérico.
+\item \texttt{204~No Content}: borrado correcto, sin cuerpo de respuesta.
+\item \texttt{400~Bad Request}: parámetros no válidos o UUID de borrado con formato incorrecto.
+\item \texttt{409~Conflict}: el identificador de la ruta no coincide con la identidad del JSON.
 \item \texttt{404~Not Found}: UUID no encontrado o fichero inexistente. La
-  respuesta JSON incluye los campos \texttt{timestamp}, \texttt{status},
-  \texttt{error}, \texttt{message} y \texttt{path} producidos por
-  \texttt{GlobalExceptionHandler}.
-\item \texttt{500~Internal Server Error}: errores inesperados de E/S.
+  respuesta de error incluye \texttt{error} y \texttt{detail}.
+\item \texttt{500~Internal Server Error}: errores inesperados de lectura, escritura o borrado.
 \end{itemize}
 
 \section{Esquema de la simulación}
 
 El cuerpo de la respuesta de \texttt{GET /api/simulations/\{id\}} sigue el
 esquema definido en el capítulo~\ref{cap:capitulo3} (sección de modelo de datos)
-y se estructura en cuatro bloques: \texttt{id} (UUID v4), \texttt{name},
-\texttt{createdAt} (ISO~8601 UTC), \texttt{metadata} (parámetros de la simulación)
-y \texttt{coveragePoints} (lista de \texttt{\{lat, lng, rsrp\}}).
+y comprende \texttt{id} (UUID v4), \texttt{name}, \texttt{createdAt}
+(ISO~8601 UTC), \texttt{parameters} (parámetros de entrada), \texttt{metadata}
+(metadatos descriptivos) y \texttt{coveragePoints} (lista de
+\texttt{\{lat, lng, rsrp\}}). Los nombres de algunos parámetros difieren entre
+escenarios MATLAB y Java.
 
 \section{Ejemplos de uso con cURL}
 
@@ -325,11 +356,17 @@ curl -s http://localhost:8080/api/simulations/a7ab9bad-3251-424e-915b-8ff3c532de
 curl -OJ http://localhost:8080/api/simulations/<UUID>/export
 \end{lstlisting}
 
+\begin{lstlisting}[language=bash, caption={Borrar una simulación tras confirmar la acción en la interfaz.}]
+curl -X DELETE http://localhost:8080/api/simulations/<UUID>
+\end{lstlisting}
+
 \section{Política CORS}
 
-El servicio configura un filtro CORS en la clase \texttt{CorsConfig} que permite
-peticiones desde \texttt{http://localhost:4200} (servidor de desarrollo de
-Angular) con los métodos GET, POST, PUT, DELETE y OPTIONS. En producción este
+El servicio configura una política CORS en la clase \texttt{CorsConfig} que permite
+peticiones desde \texttt{http://localhost:4200} (servidor de desarrollo de Angular)
+con los métodos GET, POST y DELETE. Spring gestiona las peticiones \textit{preflight}
+OPTIONS para comprobar el método solicitado; OPTIONS no figura en la lista de métodos
+de aplicación configurados. En producción este
 \textit{origin} debe restringirse al dominio definitivo o eliminar el filtro si
 backend y frontend se sirven desde el mismo \textit{host}.
 
@@ -352,7 +389,8 @@ El diagrama de componentes refleja la separación en tres capas que se describe
 en los capítulos~\ref{cap:capitulo3} y~\ref{cap:capitulo4}: el motor MATLAB que
 genera ficheros JSON, el backend Spring Boot que sirve esos ficheros mediante
 una API REST y el frontend Angular que consume la API y representa la cobertura.
-Las flechas indican la dirección del flujo de datos.
+En la simulación bajo demanda el backend incorpora además el motor Java; MATLAB se
+utiliza por separado para generar y contrastar referencias.
 
 % \begin{figure}[h!]
 % \centering

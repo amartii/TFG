@@ -16,9 +16,11 @@ REST y de la interfaz de usuario. El capítulo cierra con la justificación razo
 
 La especificación de requisitos se ha elaborado siguiendo un enfoque incremental: los
 requisitos iniciales se extrajeron de las necesidades del caso de uso táctico descrito en
-el Capítulo~\ref{cap:capitulo2} y se refinaron durante las iteraciones de desarrollo. Se
-separan en requisitos funcionales (qué debe hacer el sistema) y requisitos no funcionales
-(con qué restricciones de calidad debe hacerlo).
+el Capítulo~\ref{cap:capitulo2} y se refinaron durante las iteraciones de desarrollo. Los
+requisitos RF1--RF6 describen el flujo principal y RF8--RF9 sus apoyos de observaciones
+y calibración. La implementación actual no se conecta con una burbuja física; el
+recorrido principal se comprobó con datos sintéticos y la evaluación completa de
+las capacidades de apoyo sigue pendiente.
 
 \subsection{Requisitos Funcionales}
 \label{subsec:req_func}
@@ -35,18 +37,19 @@ ingeniero de telecomunicaciones que analiza los resultados de la simulación.
 \hline
 \textbf{ID} & \textbf{Descripción} & \textbf{Prioridad} \\
 \hline
-RF1 & El sistema debe simular la cobertura 5G FR1 (banda n78, 3,5~GHz)
-      aplicando el modelo de propagación Longley-Rice ITM sobre datos de
-      elevación SRTM de 30~m de resolución. & Alta \\
+RF1 & El sistema debe representar escenarios de cobertura 5G FR1. Los tres
+      escenarios de referencia MATLAB emplean Longley-Rice ITM y declaran
+      \texttt{SRTM\_90m\_global}; las nuevas simulaciones Java emplean
+      FSPL+Deygout sobre un raster local de elevación. & Alta \\
 \hline
 RF2 & Los resultados de cada simulación deben exportarse en formato JSON
       con un identificador UUID~v4 único, incluyendo parámetros de
       configuración, metadatos y los puntos de cobertura con coordenadas
       y valores RSRP. & Alta \\
 \hline
-RF3 & El servidor debe exponer una API REST que permita consultar el
-      listado de simulaciones disponibles y obtener el detalle completo
-      de cualquiera de ellas mediante su UUID. & Alta \\
+RF3 & El servidor debe exponer una API REST para listar, consultar, exportar y
+      borrar simulaciones, y crear nuevas predicciones bajo demanda a partir de
+      parámetros validados. & Alta \\
 \hline
 RF4 & La aplicación web debe visualizar los puntos de cobertura de una
       simulación como un \textit{heatmap} interactivo superpuesto sobre
@@ -56,6 +59,17 @@ RF4 & La aplicación web debe visualizar los puntos de cobertura de una
 RF5 & El usuario debe poder filtrar de forma interactiva los puntos de
       cobertura por umbral de RSRP mediante un control deslizante
       (\textit{slider}), actualizándose el mapa en tiempo real. & Media \\
+\hline
+RF6 & \textbf{Implementado, alcance inicial.} Permitir solicitar una
+      simulación mediante \texttt{POST /api/simulations}. El motor Java
+      calcula FSPL+Deygout sobre el raster local. MATLAB se conserva como
+      motor de referencia y comparación, no como motor de esta petición. & Alta \\
+\hline
+RF8 & Importar observaciones georreferenciadas compatibles con el proxy
+      de potencia, indicando su procedencia y fecha. & Media \\
+\hline
+RF9 & Ajustar un desplazamiento con observaciones compatibles y evaluar
+      los residuos con datos de reserva, conservando la trazabilidad. & Media \\
 \hline
 \end{tabular}
 \end{table}
@@ -91,52 +105,77 @@ RNF4 & La aplicación web debe funcionar correctamente en las dos últimas
        versiones estables de Google Chrome, Mozilla Firefox y Microsoft
        Edge. & Compatibilidad \\
 \hline
-RNF5 & La cobertura de tests unitarios y de integración del backend debe
-       ser superior al 60~\% del código fuente. & Mantenibilidad \\
+RNF5 & La cobertura de líneas de código del backend debe ser superior al
+       60~\%. El XML JaCoCo de fase~1 registró un 90,3~\% de líneas cubiertas
+       (generado el 21/11/2026). & Mantenibilidad \\
 \hline
 \end{tabular}
 \end{table}
+
+El informe Maven de fase~1, fechado el 21/11/2026, contabilizó 47 pruebas: 46 ejecutadas y
+una comparación optativa omitida, con cero fallos y errores. El XML JaCoCo de esa fase
+(\texttt{backend/target/site/jacoco/jacoco.xml}, generado a las 21:22) registró 409 de
+453 líneas cubiertas (90,3~\%) y 137 de 192 ramas (71,4~\%) en 26 clases de producción.
+Estas métricas describen cobertura estructural, no exactitud física del modelo ni
+validación empírica.
 
 % ============================================================
 \section{Arquitectura del Sistema}
 \label{sec:arquitectura}
 % ============================================================
 
-La arquitectura del sistema sigue un patrón de tres capas desacopladas, cada una con una
-responsabilidad bien definida: simulación, servicio de datos y presentación. Este diseño
-permite que cada capa evolucione de forma independiente y facilita la sustitución de
-componentes sin impacto en el resto del pipeline.
+La arquitectura distingue tres responsabilidades: simulación, servicio de datos y
+presentación. La simulación se realiza mediante un motor de referencia MATLAB y un motor
+Java bajo demanda integrado en el backend; este último no implementa Longley--Rice.
 
 \subsection{Visión General de la Arquitectura}
 \label{subsec:arq_general}
 
-El flujo de datos del gemelo digital es unidireccional y consta de cinco etapas, como se
-muestra a continuación:
+El prototipo combina dos flujos de cálculo y consulta:
 
 \begin{enumerate}
-  \item \textbf{Simulación} (MATLAB, ejecución \textit{offline}): el motor de simulación
-    calcula la cobertura RSRP sobre una cuadrícula de $60 \times 60$~puntos utilizando el
-    modelo Longley-Rice ITM con datos de elevación SRTM. El resultado se serializa en un
-    fichero JSON nombrado con un UUID~v4.
-  \item \textbf{Almacenamiento}: los ficheros JSON se depositan en un directorio compartido
-    (\lstinline{matlab/output/}) que actúa como almacén persistente del sistema. No se
-    emplea base de datos relacional: el fichero JSON \emph{es} la fuente de verdad.
-  \item \textbf{Servicio} (Spring Boot): la API REST lee los ficheros JSON del directorio
-    configurado, los deserializa con Jackson y los expone mediante \textit{endpoints}
-    RESTful documentados con OpenAPI.
-  \item \textbf{Transporte}: las peticiones HTTP entre frontend y backend se realizan sobre
-    \lstinline{localhost} en desarrollo (puertos 4200 y 8080 respectivamente), con CORS
-    habilitado explícitamente.
-  \item \textbf{Presentación} (Angular + Leaflet): la aplicación web consume la API,
-    transforma los datos al modelo interno y renderiza el \textit{heatmap} interactivo
-    sobre un mapa OpenStreetMap.
+  \item \textbf{Referencia MATLAB}: el motor Longley--Rice genera escenarios fuera de la
+    aplicación y los exporta como JSON. Los tres escenarios de referencia disponibles
+    declaran \texttt{SRTM\_90m\_global}.
+  \item \textbf{Predicción interactiva Java}: Angular envía los parámetros mediante
+    \texttt{POST /api/simulations}; Spring Boot valida la petición y ejecuta FSPL+Deygout
+    sobre el GeoTIFF local, cuya procedencia debe documentarse.
+  \item \textbf{Almacenamiento}: los resultados JSON de ambos flujos se guardan en un
+    directorio compartido. No se emplea una base de datos; el listado de ficheros permite
+    consultar salidas, pero no proporciona historial versionado ni trazabilidad de campo.
+  \item \textbf{Servicio y presentación}: Spring Boot expone operaciones REST de consulta
+    y creación; Angular consume las respuestas, las transforma al modelo interno y
+    representa los puntos RSRP sobre cartografía Leaflet.
 \end{enumerate}
 
-Este diseño desacoplado tiene una ventaja importante para el caso de uso táctico: la capa
-de simulación puede ejecutarse en un portátil con MATLAB sin conexión a internet, generar
-los JSON con los resultados y, posteriormente, cargarlos en un servidor Spring Boot ligero
-que sirva la visualización a cualquier dispositivo conectado a la red local de la burbuja
-5G. No se requiere conectividad externa en ningún punto del pipeline.
+El bucle virtual actual parte de parámetros y terreno, calcula una predicción, la muestra
+al operador y permite comparar escenarios. El flujo desde la burbuja física hacia el
+gemelo no está conectado automáticamente a un despliegue. Existe una calibración con
+observaciones compatibles, ensayada con datos sintéticos. La ejecución MATLAB requiere MATLAB y sus dependencias; las peticiones al
+motor Java no requieren esa herramienta.
+
+\subsection{Evolución prevista: bucle físico--virtual}
+\label{subsec:bucle_fisico_virtual}
+
+La relación físico--virtual prevista distingue las capacidades presentes del bucle de
+realimentación aún pendiente:
+
+\begin{enumerate}
+  \item \textbf{Representación inicial}: describir en el escenario virtual la posición y
+    configuración de los nodos y el terreno, a partir de los datos disponibles.
+  \item \textbf{Predicción interactiva (RF6, implementado)}: solicitar una nueva
+    simulación al backend mediante \texttt{POST /api/simulations}. El motor Java calcula
+    en la fase~1 una predicción de un único transmisor con FSPL+Deygout y guarda el resultado JSON.
+    MATLAB/Longley--Rice se conserva como referencia para comparación.
+  \item \textbf{Observaciones y calibración (RF8--RF9)}: importar observaciones compatibles
+    con el proxy y ajustar un desplazamiento. Se ha ensayado con datos sintéticos, sin
+    conexión automática al despliegue ni actuación sobre equipos físicos.
+\end{enumerate}
+
+La transición virtual al operador ya se materializa en predicciones bajo demanda y mapas
+para apoyar la planificación. La transición desde el sistema físico al virtual mediante
+medidas reales y su validación siguen pendientes. No existe actuación automática sobre
+los equipos físicos, por lo que tampoco se atribuye al prototipo un nivel prescriptivo.
 
 \subsection{Capa de Simulación: Motor MATLAB}
 \label{subsec:arq_matlab}
@@ -149,56 +188,61 @@ triple: (1)~configurar los parámetros de la estación base y la cuadrícula de 
 el backend.
 
 La selección de modelo sigue una lógica de degradación controlada. Si el
-\textit{Communications Toolbox} está disponible, se utiliza el modelo Longley-Rice ITM, que
-incorpora el perfil de elevación real del terreno obtenido de datos SRTM a 30~m de
-resolución. Si el \textit{toolbox} no está disponible, el script recurre al modelo
-COST-231 Hata como \textit{fallback}, registrando una advertencia en los metadatos del JSON
-de salida. En ambos casos se calcula también la pérdida en espacio libre (FSPL) como cota
-superior teórica de validación.
+\textit{Communications Toolbox} está disponible, se utiliza el modelo Longley-Rice ITM.
+Los metadatos de los tres escenarios exportados identifican los datos de elevación como
+\texttt{SRTM\_90m\_global}; no se afirma que esos resultados procedan de un tile local de
+30~m. Si el \textit{toolbox} no está disponible, el script recurre al modelo COST-231 Hata
+como \textit{fallback}. Dado que este modelo se aplica fuera de su rango de frecuencia
+habitual en los escenarios de 3,5~GHz, sus resultados no se presentan como predicciones
+cuantitativamente validadas. La FSPL puede utilizarse como referencia teórica, pero su
+comparación no equivale por sí sola a una validación empírica.
 
-La integración de datos de elevación se realiza mediante el \textit{Mapping Toolbox}:
-las funciones \lstinline{readgeoraster} y \lstinline{geointerp} cargan el \textit{tile}
-SRTM (GeoTIFF) e interpolan la altitud en cada punto de la cuadrícula. Si el fichero
-SRTM no está disponible, el sistema asume terreno plano y continúa con la simulación,
-marcando el campo \lstinline{terrain_data} del JSON como \lstinline{"flat_assumed"}.
+La integración de datos de elevación del script MATLAB se realiza mediante el
+\textit{Mapping Toolbox}: \lstinline{readgeoraster} y \lstinline{geointerp} cargan el
+GeoTIFF local para la cuadrícula. El script también intenta configurar el terreno en
+\texttt{siteviewer} para Longley--Rice; los tres JSON de referencia disponibles, sin
+embargo, declaran \texttt{SRTM\_90m\_global}. Si el fichero local no está disponible, el
+script puede continuar con terreno plano. El motor Java lee el GeoTIFF local para los
+perfiles de propagación y rechaza posiciones fuera de su extensión o con datos no válidos.
 
 \subsection{Capa de Servidor: API REST Spring Boot}
 \label{subsec:arq_backend}
 
 El backend está implementado con Spring Boot 3.2.4 sobre Java~17, utilizando Maven como
-gestor de dependencias. Su función es exponer los resultados de las simulaciones MATLAB a
-través de una API REST \textit{stateless}, sin persistencia en base de datos: los ficheros
-JSON del directorio de salida de MATLAB son la única fuente de datos.
+gestor de dependencias. Además de consultar JSON de referencia generados en MATLAB, recibe
+peticiones de simulación, valida sus parámetros y calcula una cuadrícula con FSPL y
+difracción de Deygout~\cite{deygout1966multiple} sobre el GeoTIFF local. La salida se
+persiste como JSON en el directorio configurado; no se emplea una base de datos.
 
 La estructura de paquetes sigue las convenciones estándar de Spring Boot:
 
 \begin{itemize}
   \item \lstinline{controller/}: clase \lstinline{SimulationController} con los
     \textit{endpoints} REST anotados con \lstinline{@RestController}.
-  \item \lstinline{service/}: clase \lstinline{SimulationService} que encapsula la lógica
-    de lectura y deserialización de ficheros JSON.
-  \item \lstinline{model/}: \textit{records} Java (\lstinline{SimulationSummaryDto},
-    etc.) que representan los DTOs de respuesta.
+  \item \lstinline{service/}: servicios de consulta, lectura del GeoTIFF, cálculo de
+    propagación y persistencia de nuevas simulaciones.
+  \item \lstinline{model/}: \textit{records} Java para peticiones, puntos de cobertura,
+    extensión del terreno y DTOs de respuesta.
   \item \lstinline{exception/}: clase \lstinline{SimulationNotFoundException} anotada con
     \lstinline{@ResponseStatus(HttpStatus.NOT_FOUND)} y manejador global de excepciones.
   \item \lstinline{config/}: clase \lstinline{CorsConfig} que habilita las peticiones
     \textit{cross-origin} desde \lstinline{localhost:4200}.
 \end{itemize}
 
-El diseño RESTful es completamente \textit{stateless}: cada petición contiene toda la
-información necesaria para ser procesada, no se mantiene estado de sesión en el servidor y
-todos los \textit{endpoints} son idempotentes (operaciones \lstinline{GET} exclusivamente).
-La documentación interactiva de la API se genera automáticamente mediante
+El servicio no mantiene estado de sesión. Las operaciones \lstinline{GET} consultan las
+salidas existentes y \lstinline{POST /api/simulations} crea una nueva salida persistente;
+por tanto, no todos los \textit{endpoints} son idempotentes. La documentación interactiva
+de la API se genera automáticamente mediante
 \lstinline{springdoc-openapi 2.3.0}, accesible en \lstinline{/swagger-ui.html}.
 
 \subsection{Capa de Presentación: Aplicación Angular}
 \label{subsec:arq_frontend}
 
 La interfaz de usuario está desarrollada con Angular~21 utilizando componentes
-\textit{standalone} (sin \lstinline{NgModule}), lo que simplifica la estructura del proyecto
-y mejora el \textit{tree-shaking} del compilador. La aplicación consume la API REST del
-backend y presenta los datos de cobertura como un \textit{heatmap} interactivo renderizado
-sobre un mapa OpenStreetMap mediante las bibliotecas Leaflet y \lstinline{leaflet.heat}.
+\textit{standalone} (sin \lstinline{NgModule}). La aplicación consulta simulaciones
+existentes, permite configurar una petición de simulación y la envía al backend, y presenta
+los resultados como \textit{heatmap} sobre Leaflet. Dispone de cartografía base OpenStreetMap,
+ESRI y OpenTopoMap; estas capas se obtienen de proveedores externos.
 
 La gestión de estado se basa en \textit{signals} de Angular, un mecanismo reactivo
 introducido en Angular~16 que permite propagar cambios de forma eficiente sin necesidad de
@@ -227,9 +271,10 @@ interpretarse sin información adicional externa.
 \subsection{Esquema JSON de Simulación}
 \label{subsec:esquema_json}
 
-Cada simulación se almacena en un fichero JSON independiente, nombrado con su UUID~v4
-(por ejemplo, \lstinline{b83baf94-8db6-4512-a34b-b831e3f6267a.json}). El esquema del
-fichero se muestra en el Listado~\ref{cod:json_schema}.
+Cada salida se almacena en un fichero JSON independiente, nombrado con un UUID~v4. MATLAB
+y Java incluyen parámetros, metadatos y puntos de cobertura, pero no comparten exactamente
+los mismos nombres de parámetros ni valores de metadatos. El siguiente ejemplo muestra la
+estructura de los escenarios MATLAB de referencia.
 
 \begin{lstlisting}[caption={Estructura del fichero JSON de simulación.},
   label={cod:json_schema}, basicstyle={\footnotesize\ttfamily}]
@@ -238,13 +283,14 @@ fichero se muestra en el Listado~\ref{cod:json_schema}.
   "name":      "URJC Fuenlabrada - Longley-Rice ITM",
   "createdAt": "2026-04-10T14:32:00Z",
   "parameters": {
-    "frequency_hz":    3500000000,
-    "tx_power_dbm":    40,
-    "antenna_height_m": 30,
-    "rx_height_m":     1.5,
-    "tx_latitude":     40.2897,
-    "tx_longitude":    -3.8244,
-    "area_km":         3,
+    "frecuencia_GHz": 3.5,
+    "potencia_tx_dBm": 40,
+    "ganancia_tx_dBi": 15,
+    "altura_tx_m": 30,
+    "altura_rx_m": 1.5,
+    "lat_emplazamiento": 40.2897,
+    "lon_emplazamiento": -3.8244,
+    "area_km": 3,
     "espaciado_grid_m": 50
   },
   "metadata": {
@@ -254,7 +300,7 @@ fichero se muestra en el Listado~\ref{cod:json_schema}.
     "tx_location":      { "latitude": 40.2897, "longitude": -3.8244 },
     "simulation_date":  "2026-04-10",
     "model":            "longley-rice",
-    "terrain_data":     "srtm_30m"
+    "terrain_data":     "SRTM_90m_global"
   },
   "coveragePoints": [
     { "lat": 40.2762, "lng": -3.8379, "rsrp": -97.3 },
@@ -267,28 +313,29 @@ fichero se muestra en el Listado~\ref{cod:json_schema}.
 Los campos principales son:
 
 \begin{itemize}
-  \item \lstinline{id}: identificador UUID~v4 generado por MATLAB en el momento de la
-    exportación. Sirve como clave primaria en el backend y como nombre del fichero.
+  \item \lstinline{id}: identificador UUID~v4 generado por MATLAB o por el backend Java
+    en el momento de la creación. Sirve para recuperar la salida y como nombre del fichero.
   \item \lstinline{parameters}: parámetros de configuración de la simulación (frecuencia,
     potencia, alturas de antena, coordenadas del emplazamiento y geometría de la cuadrícula).
   \item \lstinline{metadata}: información descriptiva para el frontend (modelo utilizado,
     tipo de datos de terreno, fecha de ejecución).
   \item \lstinline{coveragePoints}: array de objetos con las coordenadas geográficas
-    (\lstinline{lat}, \lstinline{lng}) y el valor RSRP en dBm de cada punto de la
-    cuadrícula. Una simulación estándar contiene 3600~puntos.
+    (\lstinline{lat}, \lstinline{lng}) y el proxy de potencia etiquetado RSRP en dBm.
+    El backend integrado omite valores inferiores a $-130$~dBm, por lo que el array
+    puede contener menos puntos que la cuadrícula.
 \end{itemize}
 
 \subsection{Validación de Datos}
 \label{subsec:validacion_datos}
 
-La integridad de los datos se garantiza mediante validaciones en dos niveles del sistema.
+La integridad de los datos se garantiza mediante validaciones en los motores y en la API.
 
 En la \textbf{capa de simulación}, MATLAB aplica restricciones sobre los valores generados
-antes de la exportación. Los valores de RSRP se recortan al rango $[-140, -40]$~dBm, que
-corresponde a los límites definidos en 3GPP TS~38.215 \cite{3gpp_ts38215_2022} para
-medidas de potencia de señal de referencia. La frecuencia de simulación se restringe al
-rango de la banda n78 (3,4--3,8~GHz), verificándose que el valor configurado en
-\lstinline{fc_Hz} caiga dentro de este intervalo.
+antes de la exportación. Los valores de RSRP se recortan al rango $[-140, -40]$~dBm. El
+script MATLAB usa como escenario por defecto 3,5~GHz; no se presenta esa configuración
+como una validación general de cualquier entrada. La petición Java valida frecuencia entre
+0,4 y 7,125~GHz, área entre 0,1 y 50~km, separación entre 10 y 10\,000~m, y que la
+cuadrícula no supere 100\,000 puntos. La versión actual admite exactamente un transmisor.
 
 En la \textbf{capa de servidor}, el backend Spring Boot aplica validaciones adicionales
 sobre las peticiones entrantes:
@@ -303,6 +350,10 @@ sobre las peticiones entrantes:
     permitir el acceso a ficheros fuera del directorio de simulaciones configurado. Los
     intentos de \textit{path traversal} se rechazan con \texttt{404 Not Found} sin
     revelar información sobre la estructura del sistema de ficheros.
+  \item \textbf{Cobertura del terreno}: el motor consulta la extensión del GeoTIFF y
+    rechaza la petición si algún perfil requiere coordenadas fuera del raster o sin
+    elevación válida. La interfaz muestra avisos de extensión, pero no sustituye la
+    validación del backend.
 \end{itemize}
 
 % ============================================================
@@ -318,57 +369,74 @@ JSON.
 \subsection{Definición de Endpoints}
 \label{subsec:endpoints}
 
-El Cuadro~\ref{tab:endpoints} resume los \textit{endpoints} disponibles en la API. Todos
-ellos son operaciones de solo lectura (\lstinline{GET}), coherente con el hecho de que las
-simulaciones se generan en MATLAB y el backend actúa exclusivamente como capa de consulta.
+El Cuadro~\ref{tab:endpoints} resume los \textit{endpoints} disponibles en la API. Los
+\lstinline{GET} sirven resultados almacenados, el \lstinline{POST} calcula y persiste una
+nueva simulación mediante el motor Java y el \lstinline{DELETE} elimina una simulación
+identificada por UUID. En la tabla, \texttt{uuid} representa el identificador de cada
+simulación, no una cadena literal de la ruta.
 
-\begin{table}[H]
-\centering
-\caption{\textit{Endpoints} de la API REST.}
-\label{tab:endpoints}
+\begingroup
 \small
-\begin{tabularx}{\textwidth}{|l|X|c|}
+\begin{longtable}{|p{5cm}|p{6cm}|p{2cm}|}
+\caption{\textit{Endpoints} de la API REST.}
+\label{tab:endpoints}\\
 \hline
 \textbf{Endpoint} & \textbf{Descripción} & \textbf{Resp.} \\
 \hline
-\texttt{GET /api/simulations} &
+\endfirsthead
+\hline
+\textbf{Endpoint} & \textbf{Descripción} & \textbf{Resp.} \\
+\hline
+\endhead
+\texttt{POST}\newline\url{/api/simulations} &
+  Recibe parámetros validados, calcula una cuadrícula con FSPL+Deygout sobre el GeoTIFF
+  local y guarda el resultado con UUID. En fase~1 admite un solo transmisor. & 200 / 400 / 422 / 503 \\
+\hline
+\texttt{GET}\newline\url{/api/simulations} &
   Devuelve el listado de simulaciones disponibles, incluyendo \texttt{id},
   \texttt{name}, \texttt{createdAt} y \texttt{metadata}. No incluye los
   \texttt{coveragePoints} para minimizar el tamaño de la respuesta. Soporta
   paginación opcional con los parámetros \texttt{?page=0\&size=10}. & 200 \\
 \hline
-\texttt{GET /api/simulations/\{uuid\}} &
+\texttt{GET}\newline\url{/api/simulations/uuid} &
   Devuelve el detalle completo de una simulación, incluyendo los
-  \texttt{coveragePoints} (hasta 3600 objetos). & 200 / 404 \\
+  \texttt{coveragePoints} de la cuadrícula generada. & 200 / 404 \\
 \hline
-\texttt{GET /api/simulations/\{uuid\}/export} &
-  Descarga el fichero JSON original de la simulación como adjunto
-  (\texttt{Content-Disposition: attachment}). & 200 / 404 \\
+\texttt{GET}\newline\url{/api/simulations/uuid/export} &
+  Descarga el fichero JSON original de la simulación como adjunto. & 200 / 404 \\
 \hline
-\texttt{GET /swagger-ui.html} &
+\texttt{DELETE}\newline\url{/api/simulations/uuid} &
+  Elimina la simulación tras la confirmación del usuario en la interfaz. Detecta una
+  discrepancia entre el UUID solicitado y el contenido del fichero. & 204 / 400 / 404 / 409 / 500 \\
+\hline
+\texttt{GET}\newline\url{/swagger-ui.html} &
   Documentación interactiva OpenAPI generada automáticamente por
   \texttt{springdoc-openapi}. & 200 \\
 \hline
-\end{tabularx}
-\end{table}
+\end{longtable}
+\endgroup
 
 \subsection{Códigos de Respuesta HTTP}
 \label{subsec:http_codes}
 
-La API utiliza un conjunto reducido de códigos de respuesta HTTP, suficiente para cubrir
-los casos de uso de un servicio de solo lectura:
+La API utiliza los siguientes códigos de respuesta HTTP:
 
 \begin{itemize}
   \item \textbf{200 OK}: la petición se ha procesado correctamente. El cuerpo contiene el
     recurso solicitado en formato JSON.
-  \item \textbf{404 Not Found}: el UUID proporcionado no corresponde a ninguna simulación
-    existente, tiene un formato inválido o el intento de acceso ha sido rechazado por la
-    protección de \textit{path traversal}. El cuerpo contiene un mensaje de error
-    genérico que no revela detalles internos.
-  \item \textbf{500 Internal Server Error}: error inesperado del servidor (por ejemplo,
-    fallo de lectura del sistema de ficheros). El manejador global de excepciones
-    (\lstinline{@ControllerAdvice}) captura la excepción y devuelve un cuerpo JSON
-    estructurado con el \textit{timestamp} y el mensaje de error.
+  \item \textbf{404 Not Found}: el UUID no corresponde a una simulación existente o el
+    intento de acceso ha sido rechazado por la protección de \textit{path traversal}.
+  \item \textbf{400 Bad Request}: la petición de creación no supera la validación de
+    parámetros o el UUID de borrado tiene un formato inválido.
+  \item \textbf{409 Conflict}: el nombre del fichero y el identificador de simulación
+    almacenado no coinciden; el borrado se rechaza para evitar eliminar otro recurso.
+  \item \textbf{422 Unprocessable Entity}: una coordenada o perfil de propagación cae fuera
+    de la extensión utilizable del raster.
+  \item \textbf{503 Service Unavailable}: el GeoTIFF configurado no está disponible o no
+    se puede leer.
+  \item \textbf{500 Internal Server Error}: error inesperado de lectura, escritura o
+    borrado del sistema de ficheros. El manejador global devuelve un cuerpo JSON con el
+    tipo de error y su detalle.
 \end{itemize}
 
 \subsection{Documentación OpenAPI}
@@ -400,7 +468,7 @@ fidelidad antes de la implementación.
 \subsection{Componentes de la Aplicación}
 \label{subsec:componentes}
 
-La aplicación Angular se estructura en siete componentes \textit{standalone}, cada uno con
+La aplicación Angular se estructura en ocho componentes \textit{standalone}, cada uno con
 una responsabilidad claramente definida. El Cuadro~\ref{tab:componentes} los describe.
 
 \begin{table}[H]
@@ -425,27 +493,30 @@ una responsabilidad claramente definida. El Cuadro~\ref{tab:componentes} los des
 \hline
 \texttt{InfoPanelComponent} &
   Panel flotante que muestra los detalles del punto seleccionado al hacer clic sobre el
-  mapa: coordenadas, valor RSRP y clasificación de cobertura. \\
+  mapa: coordenadas, valor RSRP y su intervalo visual en el prototipo. \\
 \hline
 \texttt{StatsPanelComponent} &
   Muestra estadísticas agregadas de la simulación activa: RSRP medio, mínimo y máximo,
-  número de puntos por zona de cobertura y porcentaje de área cubierta. \\
+  número de puntos por intervalo visual y fracción de puntos de la malla que superan el
+  umbral configurado. \\
 \hline
 \texttt{CoverageLegendComponent} &
   Leyenda visual con la escala de colores RSRP, indicando los umbrales y la
-  clasificación de calidad de cada zona. \\
+  etiqueta asignada a cada intervalo visual del prototipo. \\
 \hline
 \texttt{SimulationConfigComponent} &
-  Muestra los parámetros de la simulación seleccionada: frecuencia, potencia, modelo
-  de propagación, fecha de ejecución y tipo de datos de terreno. \\
+  Configura los parámetros, permite seleccionar en el mapa la ubicación del transmisor,
+  muestra advertencias de extensión y solicita simulaciones al backend. \\
+\hline
+\texttt{ComparisonViewComponent} &
+  Presenta dos simulaciones y sus parámetros para comparar valores RSRP sobre mapas. \\
 \hline
 \end{tabular}
 \end{table}
 
-Además de los componentes visuales, la aplicación cuenta con dos servicios inyectables:
-\lstinline{SimulationService}, que encapsula las llamadas HTTP al backend y mantiene el
-estado reactivo mediante \textit{signals}, y \lstinline{ThemeService}, que gestiona la
-alternancia entre tema claro y oscuro persistiendo la preferencia del usuario.
+Además de los componentes visuales, los servicios Angular gestionan las llamadas HTTP, el
+estado reactivo, la comparación de escenarios, las capas cartográficas y los temas claro y
+oscuro.
 
 \subsection{Interacción con el Mapa}
 \label{subsec:interaccion_mapa}
@@ -456,7 +527,7 @@ El mapa constituye el elemento central de la interfaz y ofrece tres formas de in
   \item \textbf{Inspección por clic}: al hacer clic sobre cualquier punto del
     \textit{heatmap}, se activa el \lstinline{InfoPanelComponent}, que muestra las
     coordenadas geográficas del punto más cercano y su valor RSRP en dBm, junto con la
-    clasificación de cobertura correspondiente.
+    etiqueta visual asignada a ese intervalo por el prototipo.
   \item \textbf{Actualización automática}: cuando el usuario selecciona una simulación
     diferente en el \lstinline{SidebarComponent}, el \textit{heatmap} se recalcula y
     rerenderiza automáticamente. El componente de mapa destruye la capa de calor anterior,
@@ -464,44 +535,42 @@ El mapa constituye el elemento central de la interfaz y ofrece tres formas de in
     al \textit{bounding box} de los nuevos puntos.
   \item \textbf{Filtrado por umbral RSRP}: un control deslizante (\textit{slider}) permite
     al usuario establecer un umbral mínimo de RSRP. Los puntos con valores inferiores al
-    umbral se ocultan del \textit{heatmap}, permitiendo visualizar únicamente las zonas con
-    calidad de señal suficiente para un servicio concreto.
+    umbral se ocultan del \textit{heatmap}. Es un filtro de presentación configurable y no
+    determina por sí solo si un servicio concreto resulta viable.
 \end{enumerate}
 
 \subsection{Paleta de Colores RSRP}
 \label{subsec:paleta_colores}
 
 La escala de colores utilizada para representar los niveles de RSRP en el \textit{heatmap}
-se ha diseñado siguiendo las convenciones habituales en herramientas de planificación
-radioeléctrica, con una progresión intuitiva de verde (señal fuerte) a rojo oscuro (sin
-cobertura). Los umbrales se basan en las recomendaciones de 3GPP TS~38.215
-\cite{3gpp_ts38215_2022} y en la práctica habitual de los operadores europeos.
+emplea una progresión de verde (valores más altos) a rojo (valores más bajos) y umbrales
+elegidos para la visualización en este
+prototipo. 3GPP TS~38.215 define las mediciones físicas de RSRP
+\cite{3gpp_ts38215_2022}, mientras TS~38.133, apartado~10.1.6, especifica el mapeo de mediciones
+a valores de informe \cite{etsi_ts138133_v153400_2026}; ninguno de esos elementos convierte
+las etiquetas de la tabla en categorías universales de calidad ni en garantías de servicio.
+Por tanto, las descripciones siguientes expresan únicamente niveles relativos de la escala
+visual implementada.
 
 \begin{table}[H]
 \centering
-\caption{Paleta de colores y umbrales RSRP.}
+\caption{Paleta de colores e intervalos visuales de RSRP.}
 \label{tab:paleta_rsrp}
 \footnotesize
 \begin{tabularx}{\textwidth}{|c|c|l|X|}
 \hline
-\textbf{Umbral RSRP} & \textbf{Color} & \textbf{Clasificación} & \textbf{Descripción} \\
+\textbf{Intervalo RSRP} & \textbf{Color} & \textbf{Etiqueta visual} & \textbf{Descripción orientativa} \\
 \hline
-$\geq -80$~dBm     & Verde         & Excelente     & Señal óptima; todos los servicios
-                                                      5G disponibles (eMBB, URLLC). \\
+$\geq -80$~dBm     & Verde         & Muy alto      & Extremo superior de la escala visual. \\
 \hline
-$-90$ a $-80$~dBm   & Amarillo-verde & Buena        & Calidad de servicio estable para
-                                                      la mayoría de aplicaciones. \\
+$-90$ a $-80$~dBm   & Amarillo-verde & Alto          & Nivel superior respecto a los intervalos
+                                                     siguientes. \\
 \hline
-$-100$ a $-90$~dBm  & Naranja       & Aceptable     & Servicio básico de datos disponible;
-                                                      posible degradación en servicios
-                                                      de baja latencia. \\
+$-100$ a $-90$~dBm  & Naranja       & Intermedio    & Nivel intermedio de la escala visual. \\
 \hline
-$-110$ a $-100$~dBm & Rojo          & Débil         & Señal muy débil; conexión inestable
-                                                      y alto riesgo de pérdida de enlace. \\
+$-110$ a $-100$~dBm & Rojo          & Bajo          & Nivel inferior de la escala visual. \\
 \hline
-$< -110$~dBm        & Rojo oscuro   & Sin cobertura & Sin servicio 5G utilizable;
-                                                      por debajo del umbral de
-                                                      sensibilidad del receptor. \\
+$< -110$~dBm        & Rojo oscuro   & Muy bajo      & Extremo inferior de la escala visual. \\
 \hline
 \end{tabularx}
 \end{table}
@@ -553,56 +622,50 @@ ecosistema y disponibilidad de herramientas de desarrollo:
 \subsection{Selección del Modelo de Propagación}
 \label{subsec:seleccion_modelo}
 
-La selección del modelo de propagación es la decisión de diseño de mayor impacto técnico
-en la precisión del gemelo digital. Se evaluaron tres modelos en un escenario de referencia
-(campus URJC de Fuenlabrada, cuadrícula $60 \times 60$, frecuencia 3,5~GHz, EIRP 53~dBm).
-Los resultados completos de la comparativa se presentan en el
-Capítulo~\ref{cap:capitulo5}; aquí se resumen las conclusiones que fundamentan la decisión
-de diseño.
+La selección del modelo de propagación es una decisión central de diseño. El flujo MATLAB
+utiliza Longley--Rice como referencia, mientras que el flujo interactivo Java combina
+FSPL y difracción de Deygout. Los resultados de la comparación entre los escenarios MATLAB
+disponibles y sus recálculos Java se presentan en el Capítulo~\ref{cap:capitulo5}; no se
+trata de un ensayo controlado con terreno idéntico ni de una validación de campo.
 
-\paragraph{FSPL (\textit{Free Space Path Loss}).} Se utiliza únicamente como referencia
-teórica de cota superior. Al no incorporar terreno ni obstáculos, produce valores de
-potencia recibida irrealmente elevados (hasta $-21,4$~dBm en zona cercana). No es un modelo
-válido para planificación real, pero resulta útil como prueba de coherencia: cualquier
-modelo realista debe producir pérdidas mayores que la FSPL.
+\paragraph{FSPL (\textit{Free Space Path Loss}).} Se utiliza como referencia teórica de
+pérdida en espacio libre y como componente del motor Java. Por sí sola no incorpora
+obstáculos; en la implementación interactiva se le suma la pérdida por difracción de
+Deygout~\cite{deygout1966multiple} sobre el perfil de elevación. Esta aproximación no
+equivale al modelo Longley--Rice ni a una validación de cobertura real.
 
-\paragraph{COST-231 Hata.} Este modelo empírico está validado para el rango
-1500--2000~MHz. Su extrapolación a 3,5~GHz introduce un error sistemático de
-$+15$ a $+20$~dB en pérdidas, lo que produce resultados catastróficos: en el escenario de
-referencia, el 95,2~\% del área aparece sin cobertura, un resultado incompatible con la
-realidad de un emplazamiento con EIRP de 53~dBm a distancias inferiores a 1,5~km.
-Se mantiene en el sistema exclusivamente como \textit{fallback} de emergencia para
-entornos MATLAB sin \textit{Communications Toolbox}, con advertencia explícita en los
-metadatos del JSON generado.
+\paragraph{COST-231 Hata.} Este modelo empírico fue desarrollado para frecuencias de hasta
+2~GHz. Su posible uso como \textit{fallback} en escenarios a 3,5~GHz queda fuera de ese
+rango y no se considera validación de la propagación en n78; cualquier resultado obtenido
+en esas condiciones debe tratarse con cautela.
 
-\paragraph{Longley-Rice ITM (modelo seleccionado).} El \textit{Irregular Terrain Model}
+\paragraph{Longley-Rice ITM (motor de referencia).} El \textit{Irregular Terrain Model}
 \cite{longley1968transmission}, validado por la NTIA para el rango 20~MHz--20~GHz
-\cite{hufford1982guide}, es el único de los tres modelos que incorpora el perfil real de
-elevación del terreno en el cálculo de pérdidas. En el escenario de referencia produce un
-RSRP medio de $-93,9$~dBm, con un 93,4~\% de los puntos por encima del umbral de
-cobertura aceptable ($-100$~dBm), lo que es coherente con las expectativas para una
-macrocelda 5G suburbana. El Cuadro~\ref{tab:comp_modelos} resume la comparativa.
+\cite{hufford1982guide}, incorpora perfiles de elevación en el cálculo de pérdidas. Se
+selecciona como motor MATLAB de referencia por su rango nominal de frecuencia y su uso en
+los escenarios disponibles; esta elección no demuestra por sí sola la precisión de sus
+resultados. El
+Cuadro~\ref{tab:comp_modelos} resume los criterios de selección.
 
 \begin{table}[H]
 \centering
-\caption{Comparativa de modelos de propagación (escenario URJC Fuenlabrada, 3,5~GHz).}
+\caption{Criterios de selección de los modelos de propagación.}
 \label{tab:comp_modelos}
-\begin{tabular}{|l|c|c|c|}
+\small
+\begin{tabularx}{\textwidth}{|X|X|X|X|}
 \hline
 \textbf{Criterio} & \textbf{FSPL} & \textbf{COST-231} & \textbf{Longley-Rice} \\
 \hline
-Validez a 3,5~GHz       & Sí (teórico)   & No ($\pm$15~dB)     & \textbf{Sí} \\
+Validez a 3,5~GHz       & Teórica & Fuera de rango & \textbf{En rango nominal} \\
 Incorpora terreno        & No             & No                   & \textbf{Sí} \\
-Coherencia con TR~38.901 & Referencia     & Parcial              & \textbf{Alta} \\
 Disponibilidad MATLAB    & Siempre        & Siempre              & Comm.~Toolbox \\
-RSRP medio               & ---            & $-125,8$~dBm         & $\mathbf{-93,9}$~\textbf{dBm} \\
-Cobertura $\geq -100$~dBm & ---           & 1,4~\%               & \textbf{93,4~\%} \\
-Rol en el sistema        & Validación     & \textit{Fallback}    & \textbf{Principal} \\
+Rol en el sistema        & Java & Fallback MATLAB & \textbf{Referencia MATLAB} \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-La decisión de diseño es, por tanto, utilizar el modelo Longley-Rice ITM como modelo
-principal del gemelo digital, con degradación automática a COST-231 Hata ---debidamente
-señalizada--- si el \textit{Communications Toolbox} no está disponible en el entorno de
-ejecución.
+La selección se aplica por motor: Longley--Rice en MATLAB y FSPL+Deygout en Java. COST-231
+Hata queda como alternativa del script MATLAB cuando no está disponible el
+\textit{Communications Toolbox}; sus resultados a 3,5~GHz no se presentan como validados.
+La comparación cuantitativa entre motores, con sus limitaciones, se expone en el
+Capítulo~\ref{cap:capitulo5}.
