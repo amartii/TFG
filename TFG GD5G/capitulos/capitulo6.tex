@@ -7,13 +7,20 @@ Este capítulo final sintetiza los logros alcanzados en el desarrollo del gemelo
 \section{Conclusiones Generales}
 \label{sec:conclusiones}
 
-El presente Trabajo de Fin de Grado ha demostrado la viabilidad técnica de construir un gemelo digital web para la planificación de cobertura de redes 5G tácticas mediante tecnologías modernas de código abierto y bajo coste. El prototipo desarrollado integra con éxito tres componentes fundamentales: un módulo de simulación radioeléctrica basado en MATLAB y el modelo de propagación Irregular Terrain Model (ITM) de Longley-Rice~\cite{longley1968transmission}, una capa de servicios REST implementada con Spring Boot, y una interfaz web interactiva desarrollada en Angular 21 que emplea Leaflet para la visualización geoespacial de mapas de calor de cobertura.
+El presente Trabajo de Fin de Grado ha desarrollado un prototipo web para planificar y visualizar cobertura de redes 5G tácticas. En la progresión descrita en el Capítulo~\ref{cap:capitulo2}, implementa el nivel descriptivo mediante escenarios MATLAB/Longley--Rice y una capacidad predictiva interactiva inicial: una aplicación Angular puede solicitar simulaciones al backend Java mediante \texttt{POST /api/simulations}. Este segundo motor calcula FSPL más difracción de Deygout sobre un perfil de elevación local; no sustituye ni reproduce Longley--Rice.
 
-Los resultados experimentales obtenidos en tres escenarios representativos ---campus suburbano de la URJC en Fuenlabrada, entorno rural de montaña en la Sierra de Guadarrama, y zona urbana densa en el centro de Madrid--- validan la capacidad del sistema para generar predicciones de RSRP coherentes con los fundamentos teóricos de propagación radioeléctrica. En particular, se ha conseguido una cobertura del 93.4\% de puntos con RSRP $\geq -100$ dBm en el escenario suburbano de referencia (URJC), con un valor medio de potencia recibida de $-93.9$ dBm, cifras que resultan compatibles con los umbrales especificados por 3GPP para servicios de datos 5G FR1~\cite{3gpp_ts38215_2022}.
+La evaluación del Capítulo~\ref{cap:capitulo5} contrasta Java y una referencia MATLAB
+con el mismo algoritmo FSPL+Deygout y supuestos comunes: dos perfiles sintéticos,
+plano y con cresta, presentan diferencias inferiores a $10^{-8}$~dB. Es evidencia
+de concordancia numérica para esos casos, no validación de campo. Se documenta además
+la comparación con tres escenarios históricos Longley--Rice, cuyos RMSE entre 12,242
+y 19,830~dB no aíslan el efecto del modelo por las diferencias de potencia,
+normalización y terreno. La comparación histórica no se repitió en esta integración
+sin el GeoTIFF histórico. No hay mediciones de campo para validar las salidas.
 
-La arquitectura de tres capas diseñada ---capa de modelado offline (MATLAB), capa de servicios (Spring Boot) y capa de presentación (Angular)--- ha demostrado ser adecuada para la validación preliminar del concepto de gemelo digital aplicado a redes tácticas. La interoperabilidad entre componentes se ha garantizado mediante un formato JSON estandarizado con identificadores únicos UUID v4, lo que permite la trazabilidad completa de cada simulación desde su generación hasta su visualización. El tiempo de carga de los mapas de calor en la interfaz web se ha mantenido por debajo de los 3 segundos en todos los casos de prueba, cumpliendo así el requisito de usabilidad establecido.
+La arquitectura permite consultar escenarios y generar nuevas salidas JSON mediante una API REST, con UUID, parámetros y metadatos de modelo y terreno. La validación del candidato integrado registró en Maven 82 casos: 79 ejecutados y superados y tres omitidos, sin fallos; el frontend superó siete pruebas y compiló correctamente. Una revisión posterior amplió la suite del frontend a nueve pruebas. Los casos omitidos corresponden al SRTM local, la recomendación con raster local y la comparación histórica. El control sintético Java--MATLAB adicional fue satisfactorio. El informe Maven de fase~1, fechado el 21/11/2026, contabilizó 47 pruebas: 46 ejecutadas y una comparación optativa omitida, sin fallos ni errores. El XML JaCoCo de esa fase (\texttt{backend/target/site/jacoco/jacoco.xml}, generado a las 21:22) registró 409 de 453 líneas cubiertas (90,3~\%) y 137 de 192 ramas (71,4~\%) en 26 clases de producción. Estas cifras históricas de cobertura no describen el candidato integrado. Una prueba funcional local en navegador cubrió flujos principales con seis JSON aislados, pero no es una suite de navegador en CI. El lector GeoTIFF corrige \texttt{PixelIsArea}, probado con un raster sintético de $2\times3$ píxeles y una regresión \texttt{PixelIsPoint}; el tile local de $3601\times3601$ es \texttt{PixelIsPoint}, por lo que esa corrección no altera el tile ni las métricas históricas del Cuadro~\ref{tab:comparacion_motores}. El requisito de renderizado de mapas en menos de tres segundos sigue sin una medición documentada.
 
-Un aspecto destacable del proyecto es la utilización exclusiva de herramientas gratuitas y de código abierto, lo que contrasta favorablemente con soluciones comerciales de planificación radioeléctrica como Xirio Online, cuyo coste de licencia anual supera los 2\,000~€. Esta característica hace que el prototipo desarrollado resulte especialmente apropiado para entornos académicos y para organizaciones con presupuestos limitados que requieran capacidades básicas de planificación de cobertura 5G.
+La simulación Java bajo demanda no requiere MATLAB; la generación y reproducción de los escenarios de referencia Longley--Rice sí depende de MATLAB y de sus recursos y licencias. El recorrido principal se comprobó en navegador con un GeoTIFF y datos sintéticos aislados. Las extensiones descritas en la Sección~\ref{sec:avances_posteriores}, incluida una calibración con datos sintéticos, se probaron localmente en una integración anterior; la evaluación completa de interacciones, la sincronización con el despliegue físico y la calibración con medidas de campo están pendientes. Docker Compose no se construyó ni ejecutó por falta de espacio. No se asigna un coste anual concreto a Xirio Online ni a otras soluciones comerciales, ya que las condiciones dependen de la modalidad y del proveedor.
 
 \section{Consecución de Objetivos}
 \label{sec:objetivos_conseguidos}
@@ -28,24 +35,27 @@ La Tabla~\ref{tab:objetivos_conseguidos} resume el grado de consecución de los 
 \toprule
 \textbf{Obj.} & \textbf{Descripción} & \textbf{Estado} & \textbf{Evidencia principal} \\
 \midrule
-OE1 & Modelar la propagación radioeléctrica de señales 5G FR1 empleando MATLAB y el modelo Longley-Rice ITM con datos topográficos reales & \textcolor{green!60!black}{Conseguido} & Tres escenarios simulados (suburbano, rural, urbano) con datos SRTM locales cuando están disponibles y fallback a terreno global en ausencia del tile local. Validación teórica frente a FSPL documentada en Capítulo~\ref{cap:capitulo5}. \\
+OE1 & Generar escenarios de cobertura 5G FR1 con MATLAB y Longley-Rice ITM & \textcolor{green!60!black}{Conseguido} & Tres JSON de referencia identifican \texttt{SRTM\_90m\_global}; los resultados se documentan como simulaciones, no medidas de campo. \\
 \midrule
-OE2 & Garantizar la interoperabilidad entre MATLAB y la aplicación web mediante un formato JSON estructurado & \textcolor{green!60!black}{Conseguido} & Script \texttt{exportar\_json.m} genera tres ficheros JSON con identificadores UUID v4. Especificación del formato JSON documentada en Capítulo~\ref{cap:capitulo3}. \\
+OE2 & Garantizar la interoperabilidad entre MATLAB y la aplicación web mediante un formato JSON estructurado & \textcolor{green!60!black}{Conseguido} & MATLAB y Java generan salidas JSON con UUID, parámetros, metadatos y puntos RSRP; los nombres de algunos parámetros difieren entre motores. \\
 \midrule
-OE3 & Desarrollar una API REST con Spring Boot para servir los datos de cobertura & \textcolor{green!60!black}{Conseguido} & Backend con 3 endpoints REST, soporte de paginación, 12 tests JUnit con 100\% de éxito, documentación Swagger. Arquitectura descrita en Capítulo~\ref{cap:capitulo3}. \\
+OE3 & Desarrollar una API REST con Spring Boot para servir los datos de cobertura & \textcolor{green!60!black}{Conseguido} & Operaciones GET, \texttt{POST} y \texttt{DELETE /api/simulations}; pruebas seleccionadas de la integración local descritas en la Sección~\ref{sec:avances_posteriores}. \\
 \midrule
-OE4 & Implementar un frontend web interactivo con Angular y visualización geoespacial & \textcolor{green!60!black}{Conseguido} & Aplicación Angular 21 con 8 componentes, gestión de estado basada en señales, mapa de calor Leaflet, vista de comparación split-screen, tres opciones de tiles cartográficos. Interfaz documentada en Capítulo~\ref{cap:capitulo4}. \\
+OE4 & Implementar un frontend web interactivo con Angular y visualización geoespacial & \textcolor{green!60!black}{Conseguido} & Angular con formulario, mapa y comparación; compilación de producción con avisos de tamaño y CommonJS; flujos principales verificados en una prueba funcional local, no en una suite CI de navegador. \\
 \midrule
-OE5 & Validar el sistema mediante pruebas funcionales y técnicas & \textcolor{green!60!black}{Conseguido} & Validación teórica del modelo Longley-Rice frente a FSPL, tres escenarios de prueba con métricas RSRP documentadas, verificación del cumplimiento de requisitos funcionales y no funcionales. Resultados en Capítulo~\ref{cap:capitulo5}. \\
+OE5 & Evaluar la coherencia de los resultados mediante pruebas técnicas & \textbf{Parcial} & Los perfiles sintéticos del mismo algoritmo concuerdan; la comparación histórica usa modelos y fuentes de terreno distintos y no hay validación de campo. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Como se observa en la tabla, los cinco objetivos específicos se han alcanzado satisfactoriamente. El objetivo OE1 se ha materializado en la implementación de un pipeline completo de simulación que procesa datos topográficos SRTM locales cuando están disponibles y recurre al terreno global del toolbox en caso de que el tile local no pueda cargarse, aplicando posteriormente el modelo ITM de Longley-Rice para calcular las pérdidas de propagación en cada punto de una malla regular. El objetivo OE2 se ha conseguido mediante el diseño de un esquema JSON que encapsula metadatos de simulación (frecuencia, potencia EIRP, coordenadas del transmisor) junto con las matrices de coordenadas y valores RSRP, garantizando la trazabilidad mediante identificadores UUID únicos.
+Los objetivos presentan distintos grados de consecución. El OE1 se acredita por la existencia de tres escenarios MATLAB/Longley--Rice; sus metadatos identifican el terreno como \texttt{SRTM\_90m\_global}. El OE2 se materializa en ficheros JSON con parámetros, metadatos, coordenadas y valores RSRP, generados tanto por MATLAB como por el servicio Java.
 
-El cumplimiento del objetivo OE3 queda acreditado por la implementación de un backend Spring Boot~\cite{spring_boot_docs} robusto que expone tres endpoints REST (listado de simulaciones, descarga de JSON completo, y consulta paginada de puntos de cobertura), incorpora validaciones de seguridad frente a path traversal, y alcanza una cobertura de pruebas del 100\% medida mediante 12 casos de test JUnit. Por su parte, el objetivo OE4 se refleja en una aplicación Angular~\cite{angular_docs} moderna que emplea la nueva API de señales para la gestión reactiva del estado, integra Leaflet~\cite{leaflet_docs} para renderizar mapas de calor interactivos, y ofrece una funcionalidad de comparación visual lado a lado de distintas simulaciones.
+El OE3 se materializa en un backend Spring Boot~\cite{spring_boot_docs} con operaciones de consulta, creación bajo demanda y borrado de ficheros; la paginación se aplica al listado, no a los puntos de cobertura. El OE4 corresponde a una aplicación Angular~\cite{angular_docs} que configura simulaciones, visualiza mapas Leaflet~\cite{leaflet_docs} y permite comparar escenarios. La interfaz muestra la extensión del raster y avisos, mientras el motor valida perfiles y elevaciones por muestra. El borrado del histórico, la comprobación de identidad y la reconciliación de las selecciones de comparación se verificaron con pruebas automatizadas y una prueba funcional local en navegador. Esta última no forma parte de una suite CI de navegador ni mide rendimiento.
 
-Finalmente, el objetivo OE5 se ha satisfecho mediante un proceso de validación en dos fases: primero, una validación teórica que demuestra que las predicciones del modelo Longley-Rice se encuentran dentro del rango esperado delimitado por el modelo FSPL en espacio libre; y segundo, una validación empírica basada en la ejecución de tres escenarios representativos que cubren tipologías suburbanas, rurales y urbanas, con análisis estadístico de las distribuciones de RSRP obtenidas.
+El OE5 queda parcial: el Capítulo~\ref{cap:capitulo5} documenta la concordancia
+Java--MATLAB controlada y la comparación separada con escenarios históricos.
+Sin medidas reales georreferenciadas no se puede afirmar que estas comparaciones
+validen la precisión de las predicciones.
 
 \section{Competencias Adquiridas}
 \label{sec:competencias}
@@ -82,17 +92,34 @@ El modelo Irregular Terrain Model (ITM) de Longley-Rice, aunque ampliamente vali
 
 Asimismo, el sistema no aborda la \textbf{propagación en interiores de edificios}, un aspecto crítico en redes 5G dado que más del 70\% del tráfico de datos se genera en espacios cerrados. Las pérdidas por penetración en muros y ventanas, altamente dependientes del tipo de construcción y materiales empleados, no están modeladas en la implementación actual.
 
-La simulación se ha limitado a un \textbf{escenario de antena única} con patrón de radiación omnidireccional ideal. Despliegues reales de 5G emplean configuraciones MIMO masivo con arrays de antenas que concentran la energía radiada en direcciones específicas mediante beamforming, afectando significativamente a los mapas de cobertura resultantes. El prototipo no soporta actualmente la especificación de patrones de radiación direccionales ni la simulación de múltiples sectores por estación base.
+La fase~1 se limitó a una antena con patrón omnidireccional ideal. Los ensayos locales
+posteriores incorporan un patrón direccional opcional aproximado, con el alcance descrito
+en la Sección~\ref{sec:avances_posteriores}. No modelan MIMO masivo, beamforming ni
+diagramas tridimensionales de una estación real.
 
-Finalmente, las simulaciones se ejecutan de forma \textbf{offline sobre escenarios estáticos}, sin capacidad para actualizar dinámicamente los mapas de cobertura ante cambios en la configuración de red o en las condiciones de propagación (meteorología, vegetación estacional). Esta limitación impide su uso como gemelo digital en sentido estricto, según la definición de Grieves~\cite{grieves2014digital}, que requiere sincronización continua entre el modelo virtual y el sistema físico.
+El alcance de esta revisión es una simulación interactiva para un único transmisor y no
+se sincroniza con una burbuja física. La calibración se ha ensayado con observaciones
+sintéticas compatibles; su validación con medidas de campo sigue pendiente.
 
 \subsection*{Limitaciones de Implementación}
 
-Desde el punto de vista arquitectónico, el backend desarrollado \textbf{no incorpora persistencia en base de datos}, limitándose a leer ficheros JSON estáticos del sistema de archivos. Esto impide funcionalidades como el historial de simulaciones, control de versiones de configuraciones, o gestión multiusuario con permisos diferenciados.
+Desde el punto de vista arquitectónico, el backend \textbf{no incorpora persistencia en base de
+datos}: almacena las nuevas simulaciones como ficheros JSON y lista los resultados del
+directorio configurado. No hay un historial versionado completo ni gestión del ciclo
+de vida de los escenarios. Los resultados de calibración conservan las observaciones
+compatibles originales, el identificador de simulación y el hash de la predicción;
+esta asociación no implica que existan medidas de campo.
 
 La aplicación web carece de \textbf{sistema de autenticación y autorización}, lo que la hace inadecuada para despliegues en entornos de producción donde distintos usuarios (planificadores, operadores de red, responsables tácticos) deban acceder con diferentes niveles de privilegios. Tampoco se ha implementado cifrado de comunicaciones mediante HTTPS, un requisito básico de seguridad para aplicaciones web que manejen datos potencialmente sensibles sobre infraestructuras críticas.
 
-La interfaz de usuario, aunque funcional, presenta \textbf{capacidades limitadas de análisis y parametrización}. No permite al usuario modificar interactivamente los parámetros de simulación (frecuencia, potencia EIRP, altura de antena) y regenerar el mapa de cobertura en tiempo real, obligando a ejecutar nuevas simulaciones en MATLAB de forma manual. Asimismo, carece de herramientas avanzadas de análisis como cálculo de estadísticos por zonas, exportación de informes, o comparación cuantitativa entre simulaciones mediante métricas de similitud.
+La interfaz de fase~1 permite cambiar parámetros y solicitar una simulación Java. La
+recomendación voraz y la calibración sintética tienen el alcance y las limitaciones de
+la Sección~\ref{sec:avances_posteriores}; la primera no garantiza un óptimo global.
+El mapa representa la extensión del GeoTIFF configurado y la interfaz advierte si la
+ubicación o el área aproximada rebasa ese rectángulo; esto no acredita la validez de cada
+píxel. El backend verifica las elevaciones al muestrear los perfiles. El borrado del
+histórico está integrado con confirmación y reconciliación de las selecciones; la
+evaluación completa de las interacciones sigue pendiente.
 
 \section{Líneas de Trabajo Futuro}
 \label{sec:futuro}
@@ -101,33 +128,50 @@ Las limitaciones identificadas en la sección anterior abren múltiples vías de
 
 \subsection*{Mejoras del Modelo de Propagación}
 
-La incorporación de técnicas de \textbf{ray-tracing determinista} mediante herramientas como Wireless InSite permitiría modelar con precisión los fenómenos de reflexión, difracción y scattering en entornos urbanos densos. Esta mejora requeriría integrar bases de datos tridimensionales de edificios, disponibles en fuentes como OpenStreetMap o catastros municipales, y supondría un incremento significativo en los tiempos de cómputo que podría mitigarse mediante aceleración por GPU.
+La incorporación de técnicas de \textbf{ray-tracing determinista} mediante herramientas como Wireless InSite permitiría estudiar los fenómenos de reflexión, difracción y scattering en entornos urbanos densos. Esta mejora requeriría integrar bases de datos tridimensionales de edificios, disponibles en fuentes como OpenStreetMap o catastros municipales, y supondría un incremento significativo en los tiempos de cómputo que podría mitigarse mediante aceleración por GPU.
 
 La extensión del sistema para simular \textbf{múltiples frecuencias simultáneas} (bandas 700~MHz, 3.5~GHz, 26~GHz) permitiría comparar el comportamiento de distintas asignaciones espectrales 5G FR1 y FR2, especialmente relevante en planificación de cobertura para operadores con licencias multi-banda. Asimismo, la implementación de modelos específicos para \textbf{propagación en interiores} (ITU-R P.1238, COST 231 Multi-Wall) habilitaría estudios de cobertura en edificios singulares como hospitales, estaciones de transporte o centros comerciales.
 
-Finalmente, la incorporación de \textbf{modelos estadísticos de fading rápido} (Rayleigh, Rice, Nakagami) sobre las predicciones de pérdida de propagación media permitiría generar estimaciones probabilísticas de cobertura, más realistas que las predicciones deterministas actuales.
+Finalmente, la incorporación de \textbf{modelos estadísticos de fading rápido} (Rayleigh, Rice, Nakagami) sobre las predicciones de pérdida de propagación media permitiría generar estimaciones probabilísticas de cobertura.
 
 \subsection*{Arquitectura en Tiempo Real}
 
-La migración hacia una arquitectura de \textbf{cómputo en tiempo real} constituye un requisito fundamental para evolucionar el prototipo hacia un verdadero gemelo digital operacional. Esto implicaría reemplazar las simulaciones offline de MATLAB por un motor de cálculo de propagación optimizado en C/C++ con aceleración GPU (CUDA, OpenCL), capaz de regenerar mapas de cobertura en menos de un segundo ante cambios de parámetros.
-
-La implementación de \textbf{comunicación bidireccional mediante WebSocket} entre backend y frontend permitiría streaming progresivo de resultados de simulación, mostrando al usuario la evolución del cálculo en tiempo real mediante actualizaciones incrementales del mapa de calor. Esta mejora resultaría en una experiencia de usuario significativamente más fluida y responsiva.
+La evolución prioritaria del motor Java ya implementado es evaluarlo con escenarios y
+perfiles de terreno controlados, fijar criterios de error y medir tiempos de cálculo.
+La referencia MATLAB FSPL+Deygout permite comparar implementaciones con supuestos
+comunes, sin tratar esta comparación como validación empírica. No se fija un objetivo
+de tiempo real ni de latencia hasta disponer de mediciones reproducibles.
 
 El despliegue de la solución en \textbf{infraestructura cloud distribuida} (AWS, Azure, Google Cloud) con balanceadores de carga y autoescalado horizontal permitiría atender demandas concurrentes de múltiples usuarios, especialmente relevante en escenarios de uso institucional. La incorporación de una \textbf{capa de caché distribuida} basada en Redis para resultados de simulaciones frecuentes reduciría la latencia de respuesta y la carga computacional en el backend.
 
 \subsection*{Nuevas Funcionalidades}
 
-Una extensión de alto valor operacional sería la implementación de un módulo de \textbf{optimización automática de ubicación de transmisores} mediante algoritmos genéticos o particle swarm optimization. Este sistema tomaría como entrada un área geográfica objetivo y restricciones de cobertura mínima, y devolvería las coordenadas óptimas de emplazamiento de una o varias estaciones base que maximicen el área cubierta minimizando el número de elementos de red desplegados.
+Una línea de evolución es contrastar y ampliar la recomendación voraz ya ensayada con
+datos sintéticos, incluyendo restricciones reales de instalación. También podrían
+estudiarse algoritmos genéticos o \textit{particle swarm optimization} para buscar
+emplazamientos que maximicen la cobertura del área objetivo. La selección actual no
+garantiza que el emplazamiento propuesto sea óptimo, ni los métodos alternativos
+garantizarían por sí solos un óptimo global.
 
-La evolución hacia \textbf{simulación multi-antena} con soporte de configuraciones MIMO y patrones de radiación sectoriales permitiría modelar despliegues reales de estaciones base 5G. Esto incluiría la capacidad de especificar diagramas de radiación 3D complejos mediante ficheros MSI Planet o formatos equivalentes, y calcular la cobertura resultante de la suma vectorial de contribuciones de múltiples sectores.
-
-La incorporación de \textbf{análisis de interferencia co-canal y de canal adyacente} entre múltiples transmisores posibilitaría estudios de planificación de frecuencias en despliegues densos, calculando métricas como la relación señal-interferencia (SINR) y su impacto en la capacidad efectiva de cada célula. Complementariamente, un módulo de \textbf{estimación de capacidad de red} basado en la ecuación de Shannon-Hartley permitiría traducir los mapas de RSRP/SINR en estimaciones de throughput disponible por usuario, información crítica para dimensionamiento de redes.
+La simulación de varios nodos y su validación constituyen una posible ampliación futura.
+También podrían investigarse configuraciones MIMO, patrones sectoriales y diagramas
+tridimensionales de radiación importados de ficheros MSI Planet o formatos equivalentes;
+estas capacidades no forman parte del alcance actual.
+La incorporación de datos de equipos físicos podría estudiarse en una evolución posterior.
 
 \subsection*{Integración con Sistemas Externos}
 
-La integración del gemelo digital con \textbf{telemetría en tiempo real de equipos reales} constituiría el paso definitivo hacia un digital twin operacional en el sentido de Fuller et al.~\cite{fuller2020digital}. Esto implicaría la conexión mediante APIs o interfaces MIB/SNMP con estaciones base 5G desplegadas en campo, recopilando métricas de carga, interferencia, y handovers que realimentarían el modelo de simulación para ajustar sus predicciones a las observaciones reales.
+Los requisitos RF8 y RF9 contemplan importar observaciones compatibles y calibrar el
+proxy. Aunque el procedimiento se ha ensayado con datos sintéticos, sigue pendiente
+su contraste con observaciones reales trazables y no existe sincronización con el despliegue.
 
-La interoperabilidad con \textbf{sistemas GIS profesionales} como QGIS mediante exportación a formatos GeoJSON o GeoTIFF facilitaría el análisis avanzado de resultados y su integración en flujos de trabajo cartográficos existentes en organizaciones que ya empleen estas herramientas. Asimismo, la incorporación de estándares \textbf{3GPP de network slicing} permitiría simular la coexistencia de múltiples slices lógicas sobre la misma infraestructura física, cada una con requisitos de cobertura y calidad de servicio diferenciados.
+El historial sigue basado en ficheros: queda añadir versionado de escenarios, trazabilidad
+de parámetros y asociación de resultados con la procedencia del terreno. Además, deben
+cerrarse los casos de borde de borrado y reconciliación de la comparación identificados en
+la revisión de código. La interfaz advierte sobre la extensión del raster, mientras la
+validez por píxel se confirma durante el muestreo del backend.
+
+La interoperabilidad con \textbf{sistemas GIS profesionales} como QGIS mediante exportación a formatos GeoJSON o GeoTIFF facilitaría el análisis avanzado de resultados y su integración en flujos de trabajo cartográficos existentes en organizaciones que ya empleen estas herramientas. Asimismo, la incorporación de estándares \textbf{3GPP de network slicing} permitiría estudiar la coexistencia de múltiples slices lógicas sobre la misma infraestructura física, cada una con requisitos de cobertura y calidad de servicio diferenciados.
 
 \subsection*{Mejoras de Usabilidad}
 
@@ -151,4 +195,4 @@ En el ámbito interno de la URJC, se propone la \textbf{integración del sistema
 \section{Reflexión Personal}
 \label{sec:reflexion}
 
-El desarrollo de este Trabajo de Fin de Grado ha constituido una experiencia formativa integral que ha permitido aplicar y consolidar conocimientos adquiridos a lo largo del grado, a la vez que ha supuesto un primer contacto directo con metodologías y herramientas propias del ejercicio profesional de la ingeniería de telecomunicaciones. La naturaleza interdisciplinar del proyecto ---que combina fundamentos de propagación radioeléctrica, desarrollo de software, y visualización de información geoespacial--- ha requerido un esfuerzo sostenido de investigación técnica, toma de decisiones de diseño, y resolución de problemas de integración entre componentes heterogéneos. La satisfacción de haber construido un sistema funcional de extremo a extremo, desde la simulación en MATLAB hasta la interfaz web final, compensa ampliamente las dificultades encontradas durante el proceso. Este trabajo sienta las bases para futuras investigaciones en el campo emergente de los gemelos digitales aplicados a redes 5G, un área de creciente relevancia tanto en la industria como en el ámbito académico.
+El desarrollo de este Trabajo de Fin de Grado ha constituido una experiencia formativa integral que ha permitido aplicar y consolidar conocimientos adquiridos a lo largo del grado, a la vez que ha supuesto un primer contacto directo con metodologías y herramientas propias del ejercicio profesional de la ingeniería de telecomunicaciones. La naturaleza interdisciplinar del proyecto ---que combina fundamentos de propagación radioeléctrica, desarrollo de software, y visualización de información geoespacial--- ha requerido un esfuerzo sostenido de investigación técnica, toma de decisiones de diseño, y resolución de problemas de integración entre componentes heterogéneos. El recorrido integra la simulación Java bajo demanda con la interfaz web; MATLAB proporciona una referencia para contrastar el cálculo. Este trabajo sienta las bases para futuras investigaciones en el campo emergente de los gemelos digitales aplicados a redes 5G, un área de creciente relevancia tanto en la industria como en el ámbito académico.

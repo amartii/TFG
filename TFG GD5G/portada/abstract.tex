@@ -3,30 +3,43 @@
 \chapter*{Abstract\markboth{Abstract}{Abstract}}
 
 Radio coverage planning for tactical 5G networks ---deployed in emergency scenarios,
-military operations or temporary events--- requires simulation tools capable of accurately
-modelling electromagnetic propagation over real terrain. Existing commercial solutions
-(Xirio Online, Atoll) impose annual licence costs exceeding \texteuro2,000, restricting
-access for budget-constrained organisations and academic environments.
+military operations or temporary events--- requires tools to estimate and visualise
+electromagnetic propagation over terrain. Licensing conditions for commercial solutions
+depend on the product and subscription model, so no single annual cost is asserted here.
 
-This Final Degree Project designs and implements a proof-of-concept web-based digital twin
-for coverage visualisation of 5G networks operating in the FR1 band (sub-6\,GHz). The
-system integrates three components in a three-tier architecture: (i)~a MATLAB simulation
-engine applying the Longley-Rice Irregular Terrain Model (ITM) propagation model over
-30\,m resolution SRTM topographic data; (ii)~a REST backend built with Spring Boot~3.2
-(Java~17) that serves simulation results through an OpenAPI-documented API; and (iii)~a
-single-page web application in Angular~21 that renders interactive coverage heatmaps on
-Leaflet-based cartography.
+This Final Degree Project implements a web prototype for a digital twin of 5G FR1
+(sub-6\,GHz) coverage with one antenna, with descriptive and initial interactive-prediction capabilities.
+Reference scenarios are generated in MATLAB with Longley--Rice and identify
+\texttt{SRTM\_90m\_global} in their metadata. For new web requests, a Java engine in the
+Spring Boot~3.2 backend (Java~17) calculates FSPL plus Deygout diffraction over a local
+GeoTIFF whose provenance must be documented. An OpenAPI-documented REST
+API connects both flows to an Angular~21 application for configuring, visualising and
+comparing scenarios on Leaflet maps.
 
-Three reference scenarios have been defined ---suburban (URJC campus, 3.5\,GHz), rural
-mountainous (Sierra de Guadarrama, 700\,MHz) and dense urban (central Madrid,
-3.5\,GHz)--- to validate model coherence against free-space theoretical bounds. The
-prototype includes visual simulation comparison features, dynamic RSRP filtering and base
-map selection. The backend incorporates 13 unit tests, path traversal security validation
-and GZIP compression.
+A controlled Java--MATLAB comparison using the same FSPL+Deygout algorithm and
+assumptions yielded differences below $10^{-8}$\,dB for two synthetic profiles.
+It establishes numerical agreement for those cases, not field validation.
+An earlier run compared three historical MATLAB scenarios ---suburban, rural and urban---
+with Java recalculations at common coordinates. Observed RMSE values ranged from 12.242 to 19.830\,dB,
+but the comparison does not isolate the propagation models: terrain, power balance and
+normalisation differ, the JSON files were not regenerated after grid-metadata corrections,
+and no field measurements are available. This comparison could not be repeated in
+the current integration without the historical GeoTIFF. The integrated candidate's
+Maven run recorded 82 cases: 79 executed and passed, and three skipped, with no failures.
+The frontend passed nine tests and built successfully. An earlier local browser functional run using
+six isolated JSON fixtures exercised simulation creation and map display, confirmed and
+cancelled deletion, invalid JSON handling, late or failed GET responses, and clearing an
+A=B comparison. It was not a CI browser suite or a latency benchmark.
+The reorganised integration was also exercised in a real browser with an isolated
+synthetic GeoTIFF and synthetic data. Building and running Docker remain pending
+because of insufficient disk space.
 
-The outcome is an accessible, extensible and open-source tool that enables
-telecommunications engineers to perform preliminary 5G coverage assessments without
-reliance on commercial licences.
+Calibration with compatible observations and site recommendations were tested with
+synthetic data, not field measurements; the greedy selection does not guarantee a
+global optimum. Synchronisation with a physical 5G bubble remains future work.
+MATLAB is still required to generate and reproduce the reference
+scenarios, but not to request predictions from the Java engine. Outputs are simulations
+expressed as a power proxy rather than physical SS-RSRP and require radio-engineering interpretation.
 
 \vspace{1em}
 \textbf{Keywords:} digital twin, 5G NR, radio coverage, Longley-Rice, SRTM, Spring Boot,

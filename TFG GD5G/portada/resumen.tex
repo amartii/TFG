@@ -4,33 +4,45 @@
 
 La planificación de cobertura radioeléctrica en redes 5G tácticas ---desplegadas en
 escenarios de emergencia, operaciones militares o eventos temporales--- requiere
-herramientas de simulación que modelen con precisión la propagación electromagnética
-sobre terreno real. Las soluciones comerciales existentes (Xirio Online, Atoll) imponen
-costes de licencia superiores a 2\,000~\texteuro/año, lo que limita su acceso para
-organismos con presupuestos restringidos y entornos académicos.
+herramientas que permitan estimar y visualizar la propagación electromagnética sobre el
+terreno. Las condiciones de licencia de las soluciones comerciales dependen del producto
+y la modalidad contratada, por lo que no se atribuye aquí un coste anual único.
 
-El presente Trabajo de Fin de Grado diseña e implementa un prototipo de concepto
-(\textit{proof-of-concept}) de gemelo digital basado en tecnologías web para la
-visualización de cobertura de redes 5G en la banda FR1 (sub-6~GHz). El sistema integra
-tres componentes en una arquitectura de tres capas: (i)~un motor de simulación en MATLAB
-que aplica el modelo de propagación Longley-Rice (Irregular Terrain Model) sobre datos
-topográficos SRTM locales cuando están disponibles y recurre al terreno global del toolbox
-cuando no es posible cargar el tile local; (ii)~un backend REST desarrollado con Spring
-Boot~3.2 (Java~17) que sirve los resultados de simulación mediante una API documentada
-con OpenAPI; y (iii)~una aplicación web de página única en Angular~21 que presenta mapas
-de calor interactivos de cobertura sobre cartografía Leaflet.
+El presente Trabajo de Fin de Grado diseña e implementa un prototipo web para un gemelo
+digital de cobertura 5G en la banda FR1 (sub-6~GHz) con una antena, con capacidades descriptivas y de
+predicción interactiva inicial. Los escenarios de referencia se generan en MATLAB con
+Longley--Rice y declaran \texttt{SRTM\_90m\_global}. Para las nuevas peticiones web, un
+motor Java integrado en Spring Boot~3.2 (Java~17) calcula FSPL más difracción de Deygout
+sobre un GeoTIFF local cuya procedencia debe documentarse. Una API REST
+documentada con OpenAPI conecta ambos flujos con una aplicación Angular~21 que permite
+configurar, visualizar y comparar escenarios sobre mapas Leaflet.
 
-Se han definido tres escenarios de referencia ---suburbano (campus URJC, 3,5~GHz),
-rural de montaña (Sierra de Guadarrama, 700~MHz) y urbano denso (centro de Madrid,
-3,5~GHz)--- que permiten validar la coherencia del modelo frente a límites teóricos de
-espacio libre. El prototipo incorpora funcionalidades de comparación visual de
-simulaciones, filtrado dinámico de RSRP y selección de cartografía base. El backend
-incluye 12 pruebas unitarias, validación de seguridad frente a \textit{path traversal}
-y compresión GZIP.
+La validación cruzada controlada de Java frente a una referencia MATLAB con el mismo
+algoritmo FSPL+Deygout y supuestos comunes obtuvo diferencias inferiores a
+$10^{-8}$~dB en dos perfiles sintéticos. Confirma la concordancia numérica para esos
+casos, pero no es validación de campo. En una ejecución anterior se compararon tres
+escenarios MATLAB históricos ---suburbano, rural y urbano--- con recálculos Java
+en coordenadas comunes. Los RMSE observados variaron entre 12,242 y
+19,830~dB, pero la comparación no aísla los modelos: difieren terreno, balance de potencia
+y normalización, y los JSON no se regeneraron tras corregir los metadatos de cuadrícula.
+Esa comparación no se pudo repetir en la integración actual sin el GeoTIFF histórico
+y no constituye validación con medidas de campo. En el candidato integrado, Maven
+registró 82 casos: 79 ejecutados y superados y tres omitidos, sin fallos. El frontend
+superó nueve pruebas y su compilación fue correcta. Una prueba funcional local anterior en
+navegador con seis JSON aislados verificó la creación y visualización del mapa, el borrado
+confirmado y cancelado, JSON inválidos, respuestas GET tardías o fallidas y limpiar una
+comparación A=B; no es una suite de navegador en CI ni una medición de latencia.
+En la integración reorganizada se comprobó también el recorrido real del navegador
+con un GeoTIFF y datos sintéticos aislados. La construcción y ejecución de Docker
+quedan pendientes por falta de espacio.
 
-El resultado es una herramienta accesible, extensible y de código abierto que permite a
-ingenieros de telecomunicaciones realizar validaciones preliminares de cobertura 5G sin
-dependencia de licencias comerciales.
+La calibración con observaciones compatibles y la recomendación de emplazamientos se
+han probado con datos sintéticos, sin validar su precisión real; la selección voraz no
+garantiza un óptimo global. La sincronización con una burbuja física sigue pendiente.
+MATLAB continúa siendo necesario para generar y reproducir los
+escenarios de referencia, pero no para solicitar una predicción mediante el motor Java.
+Los resultados son un proxy de potencia, no una medida física de SS-RSRP, y deben
+interpretarse con criterio radioeléctrico.
 
 \vspace{1em}
 \textbf{Palabras clave:} gemelo digital, 5G NR, cobertura radioeléctrica, Longley-Rice,
